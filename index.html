@@ -14,7 +14,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp,
-    collection, query, where, getDocs, limit
+    collection, query, where, getDocs, limit, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
   import {
     getAuth, onAuthStateChanged,
@@ -36,7 +36,7 @@
     const db = getFirestore(fbApp);
     const auth = getAuth(fbApp);
     window.__fb = {
-      db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit,
+      db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit, onSnapshot,
       auth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
       sendPasswordResetEmail, signOut
     };
@@ -361,7 +361,6 @@
 /* =========================================================
    데이터
    ========================================================= */
-const STORAGE_KEY = 'maranicfriends session3 test';
 const TOTAL_MISSION_CELLS = 14; // 실제 '미션' 칸 개수 (START, 무인도 제외)
 const MAX_LEVEL = 3; // 완료 단계: 1=초록, 2=파랑, 3=보라(마스터) — 블루마블 건물 업그레이드처럼 최대 3회
 const MAX_ROLLS_PER_DAY = 1; // 하루 최대 주사위 횟수
@@ -680,15 +679,7 @@ function normalizeState(parsed){
   }catch(e){ return parsed; }
 }
 
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return null;
-    return normalizeState(JSON.parse(raw));
-  }catch(e){ return null; }
-}
 function saveState(state){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   scheduleCloudSync();
 }
 function freshState(nickname, goal){
@@ -880,7 +871,7 @@ function handleAdminTap(){
   }
 }
 
-let state = null; // 로그인 상태에 따라 boot 로직에서 채워진다 (더 이상 앱 시작 시 무조건 localStorage를 신뢰하지 않음)
+let state = null; // 로그인 상태에 따라 boot 로직이 Firestore에서 직접 채워준다 (로컬 저장소는 쓰지 않음)
 
 /* =========================================================
    보드 좌표 계산 (둥근 사각 트랙 둘레에 15칸 균등 배치)
@@ -1162,6 +1153,7 @@ function renderNicknameSetup(){
     saveState(state);
     cloudCreateInitial(state); // 최초 1회이므로 통짜로 저장해도 안전함
     currentView = 'hub';
+    startParticipantListener(); // 다른 탭/기기와 실시간으로 어긋나지 않도록 구독 시작
     render();
   };
   btn.addEventListener('click', submit);
@@ -1177,6 +1169,7 @@ async function proceedAfterAuth(user){
     state = existing;
     saveState(state);
     currentView = 'hub';
+    startParticipantListener(); // 다른 탭/기기와 실시간으로 어긋나지 않도록 구독 시작
     render();
   } else {
     renderNicknameSetup();
@@ -1194,6 +1187,7 @@ function bootApp(){
     }
     window.__fb.onAuthStateChanged(window.__fb.auth, async (user)=>{
       if(!user){
+        stopParticipantListener();
         currentUser = null;
         state = null;
         renderAuthScreen();
@@ -2449,7 +2443,7 @@ function confirmReset(){
   backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) backdrop.remove(); });
   backdrop.querySelector('#cancel-reset').addEventListener('click', ()=> backdrop.remove());
   backdrop.querySelector('#confirm-reset').addEventListener('click', async ()=>{
-    localStorage.removeItem(STORAGE_KEY);
+    stopParticipantListener(); // 로그아웃 전에 실시간 구독부터 끊는다 (다른 계정 데이터가 새어 들어오는 것 방지)
     state = null;
     backdrop.remove();
     try{
@@ -2500,6 +2494,82 @@ function showToast(msg, duration=2200){
 // 앱을 켤 때(새로고침 포함) 클라우드에 있는 점수/미션레벨이 로컬보다 높으면 로컬을 그 값으로 맞춰준다.
 // (여러 탭을 써서 로컬 화면이 순간적으로 예전 값처럼 보이는 경우를 자동으로 바로잡는 안전장치)
 // 절대 값을 "낮추지"는 않고, 더 큰 값이 있을 때만 끌어올린다.
+// cloudData(클라우드에 저장된 문서 내용)를 현재 state에 안전하게 병합한다.
+// getDoc으로 한 번 가져온 결과에도, onSnapshot 실시간 이벤트로 받은 데이터에도 똑같이 재사용한다.
+function applyCloudReconciliation(cloudData){
+  let changed = false;
+  let progressAheadOnCloud = false; // 클라우드가 점수/미션기록 면에서 이 기기보다 실제로 앞서있는지
+
+  if(typeof cloudData.score === 'number' && cloudData.score > (state.score || 0)){
+    state.score = cloudData.score;
+    changed = true;
+    progressAheadOnCloud = true;
+  }
+
+  const cloudLevels = (cloudData.levels && typeof cloudData.levels === 'object') ? cloudData.levels : {};
+  Object.keys(cloudLevels).forEach(missionId=>{
+    const cloudVal = cloudLevels[missionId] || 0;
+    const localVal = (state.levels && state.levels[missionId]) || 0;
+    if(cloudVal > localVal){
+      if(!state.levels) state.levels = {};
+      state.levels[missionId] = cloudVal;
+      changed = true;
+      progressAheadOnCloud = true;
+    }
+  });
+
+  // 말의 위치(position)는 '클라우드가 점수/기록 면에서 실제로 더 앞서있을 때만' 따라간다.
+  // (단순히 "클라우드 값이 다르면 무조건" 바꾸면, 이 기기에서 방금 주사위를 굴렸는데
+  // 아직 클라우드에 반영이 안 된 시점에 새로고침했을 때 오히려 방금 굴린 위치가
+  // 예전(출발지) 위치로 잘못 되돌아가는 사고가 난다 — 그걸 막기 위한 조건이다.
+  // 진짜로 다른 기기에서 더 진행된 경우엔 점수/기록이 이미 앞서있을 것이므로 안전하다.)
+  if(progressAheadOnCloud && typeof cloudData.position === 'number' && cloudData.position !== state.position){
+    state.position = cloudData.position;
+    changed = true;
+  }
+
+  // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 "OR 병합"한다.
+  // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
+  // (체크는 기본적으로 한 방향으로만 진행되는 동작이라, 둘 중 하나라도 체크했으면
+  // 안 지워지게 유지하는 게 안전하다 — 다른 기기에서 체크한 걸 이 기기가 다시 저장할 때
+  // 실수로 덮어써서 지워버리는 사고를 막아준다)
+  ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
+    const cloudChecks = (cloudData[key] && typeof cloudData[key] === 'object') ? cloudData[key] : {};
+    if(!state[key]) state[key] = {};
+    Object.keys(cloudChecks).forEach(dayIdx=>{
+      if(cloudChecks[dayIdx] && !state[key][dayIdx]){
+        state[key][dayIdx] = true;
+        changed = true;
+      }
+    });
+  });
+
+  // 오늘 주사위를 이미 몇 번 썼는지는, 다른 기기가 이미 더 많이 썼다면 그 값을 따라간다.
+  // (이걸 안 맞추면 한쪽 기기가 "하루 1회 제한"을 모르고 또 굴릴 수 있음)
+  if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
+    const cloudCount = cloudData.dailyRolls.count || 0;
+    const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
+    if(cloudCount > localCount){
+      state.dailyRolls = { date: getTodayStr(), count: cloudCount };
+      changed = true;
+    }
+  }
+
+  // 보너스 찬스는 이제 클라우드에서 오직 더하기/빼기(increment)로만 바뀌기 때문에,
+  // 클라우드 값이 항상 정확하다. 그래서 '더 큰 값'이 아니라 클라우드 값을 그대로 따라간다.
+  if(typeof cloudData.bonusRolls === 'number' && cloudData.bonusRolls !== (state.bonusRolls || 0)){
+    state.bonusRolls = cloudData.bonusRolls;
+    changed = true;
+  }
+  // 무인도 페널티 이월은 더 큰 값을 따라간다(안전한 쪽으로).
+  if(typeof cloudData.pendingPenalty === 'number' && cloudData.pendingPenalty > (state.pendingPenalty || 0)){
+    state.pendingPenalty = cloudData.pendingPenalty;
+    changed = true;
+  }
+
+  return changed;
+}
+
 async function reconcileWithCloud(){
   if(!window.__fb || !state || !currentUser) return;
   try{
@@ -2507,78 +2577,7 @@ async function reconcileWithCloud(){
     if(!ref) return;
     const snap = await window.__fb.getDoc(ref);
     if(!snap.exists()) return;
-    const cloudData = snap.data();
-    let changed = false;
-
-    let progressAheadOnCloud = false; // 클라우드가 점수/미션기록 면에서 이 기기보다 실제로 앞서있는지
-
-    if(typeof cloudData.score === 'number' && cloudData.score > (state.score || 0)){
-      state.score = cloudData.score;
-      changed = true;
-      progressAheadOnCloud = true;
-    }
-
-    const cloudLevels = (cloudData.levels && typeof cloudData.levels === 'object') ? cloudData.levels : {};
-    Object.keys(cloudLevels).forEach(missionId=>{
-      const cloudVal = cloudLevels[missionId] || 0;
-      const localVal = (state.levels && state.levels[missionId]) || 0;
-      if(cloudVal > localVal){
-        if(!state.levels) state.levels = {};
-        state.levels[missionId] = cloudVal;
-        changed = true;
-        progressAheadOnCloud = true;
-      }
-    });
-
-    // 말의 위치(position)는 '클라우드가 점수/기록 면에서 실제로 더 앞서있을 때만' 따라간다.
-    // (단순히 "클라우드 값이 다르면 무조건" 바꾸면, 이 기기에서 방금 주사위를 굴렸는데
-    // 아직 클라우드에 반영이 안 된 시점에 새로고침했을 때 오히려 방금 굴린 위치가
-    // 예전(출발지) 위치로 잘못 되돌아가는 사고가 난다 — 그걸 막기 위한 조건이다.
-    // 진짜로 다른 기기에서 더 진행된 경우엔 점수/기록이 이미 앞서있을 것이므로 안전하다.)
-    if(progressAheadOnCloud && typeof cloudData.position === 'number' && cloudData.position !== state.position){
-      state.position = cloudData.position;
-      changed = true;
-    }
-
-    // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 "OR 병합"한다.
-    // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
-    // (체크는 기본적으로 한 방향으로만 진행되는 동작이라, 둘 중 하나라도 체크했으면
-    // 안 지워지게 유지하는 게 안전하다 — 다른 기기에서 체크한 걸 이 기기가 다시 저장할 때
-    // 실수로 덮어써서 지워버리는 사고를 막아준다)
-    ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
-      const cloudChecks = (cloudData[key] && typeof cloudData[key] === 'object') ? cloudData[key] : {};
-      if(!state[key]) state[key] = {};
-      Object.keys(cloudChecks).forEach(dayIdx=>{
-        if(cloudChecks[dayIdx] && !state[key][dayIdx]){
-          state[key][dayIdx] = true;
-          changed = true;
-        }
-      });
-    });
-
-    // 오늘 주사위를 이미 몇 번 썼는지는, 다른 기기가 이미 더 많이 썼다면 그 값을 따라간다.
-    // (이걸 안 맞추면 한쪽 기기가 "하루 1회 제한"을 모르고 또 굴릴 수 있음)
-    if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
-      const cloudCount = cloudData.dailyRolls.count || 0;
-      const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
-      if(cloudCount > localCount){
-        state.dailyRolls = { date: getTodayStr(), count: cloudCount };
-        changed = true;
-      }
-    }
-
-    // 보너스 찬스는 이제 클라우드에서 오직 더하기/빼기(increment)로만 바뀌기 때문에,
-    // 클라우드 값이 항상 정확하다. 그래서 '더 큰 값'이 아니라 클라우드 값을 그대로 따라간다.
-    if(typeof cloudData.bonusRolls === 'number' && cloudData.bonusRolls !== (state.bonusRolls || 0)){
-      state.bonusRolls = cloudData.bonusRolls;
-      changed = true;
-    }
-    // 무인도 페널티 이월은 더 큰 값을 따라간다(안전한 쪽으로).
-    if(typeof cloudData.pendingPenalty === 'number' && cloudData.pendingPenalty > (state.pendingPenalty || 0)){
-      state.pendingPenalty = cloudData.pendingPenalty;
-      changed = true;
-    }
-
+    const changed = applyCloudReconciliation(snap.data());
     if(changed){
       saveState(state);
       if(currentView === 'hub' || currentView === 'marble') render();
@@ -2587,6 +2586,38 @@ async function reconcileWithCloud(){
   }catch(e){
     console.warn('cloud 보정 확인 실패:', e);
     return null; // 확인 자체가 실패한 경우(네트워크 오류 등)
+  }
+}
+
+// 탭/기기 여러 개를 동시에 열어놓고 쓸 때 서로 어긋나는 문제를 막기 위한 실시간 리스너.
+// 어느 탭에서든 주사위를 굴리거나 미션을 완료하면, 다른 모든 탭이 곧바로 그 변화를 알아채고
+// (기존 reconcileWithCloud와 똑같이 '안전한 방향으로만' 병합해서) 화면을 맞춰준다.
+let unsubscribeParticipant = null;
+function startParticipantListener(){
+  stopParticipantListener();
+  if(!window.__fb || !currentUser) return;
+  const ref = cloudDocRef();
+  if(!ref) return;
+  unsubscribeParticipant = window.__fb.onSnapshot(ref, (snap)=>{
+    // 이 탭이 방금 스스로 쓴 내용이 서버 확인 전(local pending write) 단계로 돌아온 이벤트는 건너뛴다.
+    // (아직 서버가 확정하지 않은, 이미 이 탭이 알고 있는 내용이라 다시 처리할 필요가 없다)
+    if(snap.metadata && snap.metadata.hasPendingWrites) return;
+    if(!snap.exists() || !state) return;
+    // 주사위 굴리는 애니메이션 중에는 화면을 건드리지 않는다 (다른 탭 변화 때문에 애니메이션이 끊기는 걸 방지).
+    if(isRolling) return;
+    const changed = applyCloudReconciliation(snap.data());
+    if(changed){
+      saveState(state);
+      if(currentView === 'hub' || currentView === 'marble') render();
+    }
+  }, (err)=>{
+    console.warn('실시간 동기화 연결 실패:', err);
+  });
+}
+function stopParticipantListener(){
+  if(unsubscribeParticipant){
+    unsubscribeParticipant();
+    unsubscribeParticipant = null;
   }
 }
 
