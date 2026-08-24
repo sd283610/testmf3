@@ -2496,7 +2496,9 @@ function showToast(msg, duration=2200){
 // 절대 값을 "낮추지"는 않고, 더 큰 값이 있을 때만 끌어올린다.
 // cloudData(클라우드에 저장된 문서 내용)를 현재 state에 안전하게 병합한다.
 // getDoc으로 한 번 가져온 결과에도, onSnapshot 실시간 이벤트로 받은 데이터에도 똑같이 재사용한다.
-function applyCloudReconciliation(cloudData){
+// trustPosition=true면 위치를 점수 증가 여부와 상관없이 클라우드 값 그대로 믿고 따라간다.
+// (실시간 리스너처럼, 이미 '서버가 확정한 진짜 최신 상태'임이 보장된 경우에만 true로 넘긴다)
+function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
   let changed = false;
   let progressAheadOnCloud = false; // 클라우드가 점수/미션기록 면에서 이 기기보다 실제로 앞서있는지
 
@@ -2523,7 +2525,7 @@ function applyCloudReconciliation(cloudData){
   // 아직 클라우드에 반영이 안 된 시점에 새로고침했을 때 오히려 방금 굴린 위치가
   // 예전(출발지) 위치로 잘못 되돌아가는 사고가 난다 — 그걸 막기 위한 조건이다.
   // 진짜로 다른 기기에서 더 진행된 경우엔 점수/기록이 이미 앞서있을 것이므로 안전하다.)
-  if(progressAheadOnCloud && typeof cloudData.position === 'number' && cloudData.position !== state.position){
+  if((trustPosition || progressAheadOnCloud) && typeof cloudData.position === 'number' && cloudData.position !== state.position){
     state.position = cloudData.position;
     changed = true;
   }
@@ -2605,7 +2607,7 @@ function startParticipantListener(){
     if(!snap.exists() || !state) return;
     // 주사위 굴리는 애니메이션 중에는 화면을 건드리지 않는다 (다른 탭 변화 때문에 애니메이션이 끊기는 걸 방지).
     if(isRolling) return;
-    const changed = applyCloudReconciliation(snap.data());
+    const changed = applyCloudReconciliation(snap.data(), { trustPosition: true });
     if(changed){
       saveState(state);
       if(currentView === 'hub' || currentView === 'marble') render();
