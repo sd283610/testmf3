@@ -1,0 +1,2497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>러닝 마블 | 마라닉프렌즈 9기 </title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  // Firebase 연결 (Firestore) — 러닝마블 진행상황을 클라우드에도 백업/동기화한다.
+  // 로컬(localStorage)이 항상 1차 저장소라 네트워크가 느려도 앱은 그대로 잘 작동하고,
+  // Firestore 쪽은 "실패해도 무시하고 계속 진행"하는 best-effort 방식으로 붙인다.
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBaEPog4-46EPF-D7R1XDtPZnYM70g9TH0",
+    authDomain: "test-mf3.firebaseapp.com",
+    projectId: "test-mf3",
+    storageBucket: "test-mf3.firebasestorage.app",
+    messagingSenderId: "623728454700",
+    appId: "1:623728454700:web:fab85835df138a7290f589"
+  };
+
+  try{
+    const fbApp = initializeApp(firebaseConfig);
+    const db = getFirestore(fbApp);
+    window.__fb = { db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp };
+  }catch(e){
+    console.warn('Firebase 초기화 실패 (로컬 저장만 사용됨):', e);
+    window.__fb = null;
+  }
+</script>
+<style>
+  :root{
+    --bg:#FBFAF7;
+    --bg-elev:#FFFFFF;
+    --bg-elev-2:#F3F1EA;
+    --line:#E7E4DA;
+    --text:#20241F;
+    --text-dim:#767C72;
+    --sunset-1:#FF6B4A;
+    --sunset-2:#FF3E7F;
+    --track:#F5A623;
+    --complete:#1FA97A;
+    --complete-dim:#E4F6EE;
+    --level2:#2F6FED;
+    --level2-dim:#E7EEFD;
+    --level3:#8b5cf6;
+    --level3-dim:#f5f3ff;
+    --level4:#F5A623;
+    --level4-dim:#FDF3E1;
+    --level5:#C9971C;
+    --level5-dim:#FBF3DC;
+  }
+  *{box-sizing:border-box;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .font-display{font-family:'Space Grotesk',sans-serif;}
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px;}
+
+  .grain{
+    position:fixed;inset:0;pointer-events:none;opacity:0.02;z-index:1;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .sunset-text{
+    background:linear-gradient(90deg,var(--sunset-1),var(--sunset-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .track-btn{
+    background:linear-gradient(90deg,var(--sunset-1),var(--sunset-2));
+    transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    box-shadow:0 8px 24px -8px rgba(255,62,127,.5);
+  }
+  .track-btn:active{transform:scale(.96);}
+  .track-btn:disabled{opacity:.4;filter:grayscale(.4);box-shadow:none;transform:none;cursor:not-allowed;}
+
+  /* ---- Board ---- */
+  #board-wrap{
+    position:relative;width:83%;aspect-ratio:1/1;max-width:640px;margin:0 auto;
+  }
+  #board-field{
+    position:absolute;inset:5%;
+    border-radius:38px;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,107,74,.06), transparent 55%),
+      radial-gradient(circle at 70% 80%, rgba(255,62,127,.06), transparent 55%),
+      var(--bg-elev-2);
+    border:1px dashed var(--line);
+  }
+  .lane-outline{
+    position:absolute;inset:2%;
+    border-radius:34px;
+    border:2px solid var(--line);
+  }
+  .cell{
+    position:absolute;
+    width:19%;height:19%;
+    transform:translate(-50%,-50%);
+    display:flex;align-items:center;justify-content:center;
+    border-radius:16px;
+    background:var(--bg-elev);
+    border:1.5px solid var(--line);
+    box-shadow:0 2px 8px -2px rgba(32,36,31,.08);
+    cursor:pointer;
+    transition:background .25s ease, border-color .25s ease, transform .2s ease, box-shadow .2s ease;
+    z-index:2;
+  }
+  .cell:hover{transform:translate(-50%,-50%) scale(1.08); border-color:var(--sunset-1); box-shadow:0 6px 16px -4px rgba(255,62,127,.25);}
+  .cell.lvl1{
+    background:var(--complete-dim);
+    border-color:var(--complete);
+  }
+  .cell.lvl1 .cell-num{color:var(--complete);}
+  .cell.lvl2{
+    background:var(--level2-dim);
+    border-color:var(--level2);
+  }
+  .cell.lvl2 .cell-num{color:var(--level2);}
+  .cell.lvl3{
+    background:var(--level3-dim);
+    border-color:var(--level3);
+  }
+  .cell.lvl3 .cell-num{color:var(--level3);}
+  .cell.lvl4{
+    background:var(--level4-dim);
+    border-color:var(--level4);
+  }
+  .cell.lvl4 .cell-num{color:var(--level4);}
+  .cell.lvl5{
+    background:var(--level5-dim);
+    border-color:var(--level5);
+  }
+  .cell.lvl5 .cell-num{color:var(--level5);}
+  .cell.start{
+    background:linear-gradient(135deg,var(--sunset-1),var(--sunset-2));
+    border-color:transparent;
+    box-shadow:0 4px 14px -4px rgba(255,62,127,.45);
+  }
+  .cell.island{
+    background:repeating-linear-gradient(135deg, var(--bg-elev-2), var(--bg-elev-2) 6px, #ECE9DE 6px, #ECE9DE 12px);
+    border:2px dashed #9a9a95;
+  }
+  .cell.event{
+    background: var(--bg-elev);
+    border: 1.5px solid #FF3333; /* 쨍한 빨간색 실선 — 이벤트(물음표) 칸 */
+    box-shadow: 0 2px 8px -2px rgba(32,36,31,.08);
+    cursor:default;
+    pointer-events:none; /* 클릭해도 아무 반응 없음 — 도착해야만 어떤 효과인지 알 수 있음 */
+  }
+  .cell.event .cell-emoji{ color:#FF3333; font-weight:900; }
+  .cell-num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;font-weight:700;color:var(--text-dim);
+    position:absolute;top:4px;left:7px;
+  }
+  .cell.start .cell-num{color:rgba(255,255,255,.85);}
+  .cell-emoji{font-size:20px; transition:opacity .25s ease;}
+  .cell-check{position:absolute;bottom:3px;right:5px;font-size:11px;}
+  .cell.current{border-color:var(--sunset-1); box-shadow:0 0 0 3px rgba(255,107,74,.18), 0 2px 8px -2px rgba(32,36,31,.08);}
+  .cell.current .cell-emoji{opacity:.3;}
+
+  #token{
+    position:absolute;
+    width:14%;height:14%;
+    transform:translate(-50%,-50%);
+    margin-top:-30px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:38px;
+    z-index:5;
+    pointer-events:none;
+    transition: left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1);
+    filter:drop-shadow(0 4px 10px rgba(255,107,74,.45));
+  }
+  #token::after{
+    content:'';
+    position:absolute;left:50%;bottom:-9px;
+    transform:translateX(-50%);
+    width:0;height:0;
+    border-left:7px solid transparent;
+    border-right:7px solid transparent;
+    border-top:9px solid var(--sunset-1);
+  }
+  #token-glow{
+    position:absolute;inset:-30%;
+    border-radius:999px;
+    background:radial-gradient(circle, rgba(255,107,74,.28), transparent 70%);
+    animation:pulseGlow 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseGlow{0%,100%{opacity:.6;transform:scale(1);}50%{opacity:1;transform:scale(1.15);}}
+
+  /* ---- Dice ---- */
+  .dice-pair{ display:flex; gap:10px; }
+  .die{
+    width:52px;height:52px;border-radius:13px;
+    background:#FFFFFF;
+    border:1.5px solid var(--line);
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    padding:7px;gap:2px;
+    box-shadow:0 6px 18px -6px rgba(32,36,31,.25);
+  }
+  .pip{width:100%;height:100%;border-radius:50%;background:transparent;align-self:center;justify-self:center;}
+  .pip.on{background:var(--text);}
+  .die.rolling{animation:diceSpin .18s linear infinite;}
+  @keyframes diceSpin{
+    0%{transform:rotate(0deg) scale(1);}
+    50%{transform:rotate(180deg) scale(1.12);}
+    100%{transform:rotate(360deg) scale(1);}
+  }
+
+  /* ---- Modal ---- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(6,8,12,.72);backdrop-filter:blur(6px);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;
+    animation:fadeIn .2s ease;
+  }
+  @media(min-width:640px){.modal-backdrop{align-items:center;}}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .modal-card{
+    background:var(--bg-elev);
+    border:1px solid var(--line);
+    border-radius:24px 24px 0 0;
+    width:100%;max-width:420px;
+    padding:28px 24px 24px;
+    animation:slideUp .28s cubic-bezier(.4,0,.2,1);
+  }
+  @media(min-width:640px){.modal-card{border-radius:24px;}}
+  @keyframes slideUp{from{transform:translateY(40px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+  /* ---- 선물 칸: 보드 미니맵 선택 ---- */
+  .gift-mini-board{
+    position:relative;
+    width:100%;
+    max-width:280px;
+    aspect-ratio:1/1;
+    margin:0 auto;
+  }
+  .gift-mini-cell{
+    position:absolute;
+    width:14%; height:14%;
+    transform:translate(-50%,-50%);
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px;
+    background:var(--bg-elev-2);
+    border:1.5px solid var(--line);
+    font-size:12px;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .gift-mini-cell[data-idx]{ cursor:pointer; }
+  .gift-mini-cell[data-idx]:hover{ transform:translate(-50%,-50%) scale(1.15); border-color:var(--sunset-1); z-index:2; }
+  .gift-mini-cell[data-idx]:active{ transform:translate(-50%,-50%) scale(.95); }
+  .gift-mini-cell.start{ background:linear-gradient(135deg,var(--sunset-1),var(--sunset-2)); border-color:transparent; }
+  .gift-mini-cell.island{ background:repeating-linear-gradient(135deg, var(--bg-elev-2), var(--bg-elev-2) 4px, #ECE9DE 4px, #ECE9DE 8px); border:1.5px dashed #9a9a95; }
+  .gift-mini-cell.event{ background:#FFFFFF; border:1.5px solid #FF3333; color:#FF3333; font-weight:900; }
+  .gift-mini-cell.lvl1{ background:var(--complete-dim); border-color:var(--complete); }
+  .gift-mini-cell.lvl2{ background:var(--level2-dim); border-color:var(--level2); }
+  .gift-mini-cell.lvl3{ background:var(--level3-dim); border-color:var(--level3); }
+  .gift-mini-cell.lvl4{ background:var(--level4-dim); border-color:var(--level4); }
+  .gift-mini-cell.lvl5{ background:var(--level5-dim); border-color:var(--level5); }
+  .gift-mini-cell.current{ box-shadow:0 0 0 2px var(--sunset-1); z-index:1; }
+  .gift-mini-cell.selected{ box-shadow:0 0 0 3px var(--sunset-1), 0 4px 10px -2px rgba(255,62,127,.4); transform:translate(-50%,-50%) scale(1.15); z-index:3; }
+
+  .fade-in{animation:fadeIn .3s ease;}
+
+  /* ---- 허브 화면 2x2 프로그램 카드 ---- */
+  .hub-card{
+    border-radius:22px;
+    background:var(--bg-elev);
+    border:1.5px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    padding:22px 12px;
+    text-align:center;
+    box-shadow:0 2px 8px -2px rgba(32,36,31,.06);
+    cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .hub-card:hover{ transform:translateY(-3px); border-color:var(--sunset-1); box-shadow:0 8px 20px -6px rgba(255,62,127,.25); }
+  .hub-card:active{ transform:scale(.97); }
+  .hub-card-emoji{ font-size:28px; }
+  .hub-card-label{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
+  .hub-card-desc{ font-size:11px; color:var(--text-dim); line-height:1.35; }
+
+  /* ---- 러닝마블: 가로로 긴 카드 ---- */
+  .hub-card-wide{
+    width:100%;
+    flex-direction:row;
+    justify-content:flex-start;
+    text-align:left;
+    gap:16px;
+    padding:18px 20px;
+  }
+  .hub-card-wide .hub-card-emoji{ font-size:34px; flex-shrink:0; }
+  .hub-card-wide .hub-card-text{ display:flex; flex-direction:column; gap:3px; }
+
+  /* ---- 10K 훈련 프로그램 체크리스트 ---- */
+  .training-row{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 14px;
+    background:var(--bg-elev);
+    border-bottom:1px solid var(--line);
+    transition:background .15s ease;
+  }
+  .training-row:nth-child(even){ background:var(--bg); }
+  .training-row:last-child{ border-bottom:none; }
+  .training-row.done{ background:var(--complete-dim); }
+  .training-check{
+    width:28px; height:28px; flex-shrink:0;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    background:var(--bg-elev-2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px;
+    cursor:pointer;
+  }
+  .training-row.done .training-check{ border-color:var(--complete); background:#fff; }
+  .training-row-text{ flex:1; min-width:0; cursor:pointer; }
+  .training-date{
+    font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:700;
+    color:var(--text-dim); margin:0;
+  }
+  .training-activity{
+    font-size:13px; font-weight:600; color:var(--text); margin:2px 0 0;
+  }
+  .training-row.done .training-activity{ color:var(--complete); }
+
+  /* ---- Toast ---- */
+  .toast{
+    position:fixed;
+    background:var(--bg-elev);border:1px solid var(--line);
+    box-shadow:0 10px 30px -8px rgba(32,36,31,.25);
+    padding:12px 20px;border-radius:999px;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;
+    z-index:60;display:flex;align-items:center;gap:8px;white-space:nowrap;
+    animation:toastIn .25s ease;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,-12px);}to{opacity:1;transform:translate(-50%,0);}}
+</style>
+</head>
+<body class="min-h-screen">
+<div class="grain"></div>
+
+<div id="app" class="relative z-10 max-w-xl mx-auto px-5 pb-16 pt-8"></div>
+
+<script>
+/* =========================================================
+   데이터
+   ========================================================= */
+const STORAGE_KEY = 'maranicfriends session3 test';
+const TOTAL_MISSION_CELLS = 14; // 실제 '미션' 칸 개수 (START, 무인도 제외)
+const MAX_LEVEL = 3; // 완료 단계: 1=초록, 2=파랑, 3=보라(마스터) — 블루마블 건물 업그레이드처럼 최대 3회
+const MAX_ROLLS_PER_DAY = 1; // 하루 최대 주사위 횟수
+const CAMPAIGN_START_DATE = '2026-08-30'; // 러닝마블 주사위를 시작할 수 있는 날짜 (관리자 모드는 예외)
+
+const MISSIONS = [
+  { id:'start', emoji:'🏁', title:'START', desc:'마라닉프렌즈 9기, 2주간의 러닝 마블이 시작돼요.' },
+  { id:'icecream_run', emoji:'🍦', title:'아이스크림런', desc:'러닝 후 아이스크림 하나로 나에게 상 주기 🍦' },
+  { id:'wide_squat', emoji:'🏋️', title:'와이드 스쿼트 15개 3세트', desc:'중둔근, 내전근 강화! 와이드 스쿼트 15개 x 3세트' },
+  { id:'event1', emoji:'❓', title:'이벤트 칸', desc:'도착하면 랜덤 효과가 발동해요', isEvent:true },
+  { id:'eggs', emoji:'🥚', title:'계란 2개 챙겨먹기', desc:'회복을 위한 단백질! 오늘은 계란 2개 챙겨먹기' },
+  { id:'sky_photo', emoji:'☁️', title:'오늘 하늘은 어떤가요?', desc:'하늘 사진 찍어서 인증하기' },
+  { id:'icing', emoji:'🧊', title:'아이싱하기', desc:'무릎, 종아리, 발목 아이싱하기' },
+  { id:'event2', emoji:'❓', title:'이벤트 칸', desc:'도착하면 랜덤 효과가 발동해요', isEvent:true },
+  { id:'walking_lunge', emoji:'🦵🏼', title:'워킹 런지 20걸음 3세트', desc:'앞으로 가면서 런지! 런지 20걸음 x 3세트' },
+  { id:'running_haiku', emoji:'3️⃣', title:'삼행시 짓기', desc:'인증 회차에 따라 아래 단어로 삼행시를 지어주세요!\n\n1회차 : 달리기\n\n2회차 : 마라톤\n\n3회차 : 풀코스' },
+  { id:'island', emoji:'🏝️', title:'무인도', desc:'표류 주의! 무인도에 걸리면 주사위 2개로 탈출을 시도해야 해요. 3번 안에 같은 숫자(더블)가 나와야 탈출! 🏴‍☠️', isIsland:true },
+  { id:'bread_run', emoji:'🍞', title:'빵빵런', desc:'빵이나 떡으로 탄수화물 챙기기 Tip.흰 식빵 1~2조각은 러닝 전 빠르고 간단한 에너지원으로 쓰기 좋아요' },
+  { id:'event3', emoji:'❓', title:'이벤트 칸', desc:'도착하면 랜덤 효과가 발동해요', isEvent:true },
+  { id:'foam_roller', emoji:'💆', title:'폼롤러 마사지', desc:'폼롤러로 종아리, 허벅지 등 마사지하기' },
+  { id:'pushup', emoji:'💪', title:'팔굽혀펴기 10개 3세트', desc:'무릎 대고 해도 괜찮고 할 수 있는 만큼만 하셔도 좋아요! 자신 있으신 분들은 15~20개 3세트💪' },
+  { id:'uphill', emoji:'⛰️', title:'오르막 훈련', desc:'오르막 코스를 찾아 최소 1회 업힐 훈련 진행하기 또는 트레드밀 경사도 설정해서 달리기' },
+  { id:'event4', emoji:'❓', title:'이벤트 칸', desc:'도착하면 랜덤 효과가 발동해요', isEvent:true },
+  { id:'calf_raise', emoji:'🦵', title:'러닝 후 카프레이즈 20개 3세트', desc:'종아리 강화! 카프레이즈 20개 x 3세트' },
+  { id:'running_score', emoji:'✍️', title:'오늘의 러닝 점수는?', desc:'인증 시 오늘의 러닝 점수는 10점 만점 중 몇 점인지 그리고 그 이유 작성하기' },
+  { id:'visualize_goal', emoji:'🎯', title:'목표 달성한 나를 상상하며 달리기', desc:'완주 또는 기록 향상으로 골인하는 나를 상상하며 달리기. 이 미션은 사진으로 인증하기 어려우니 인증글 올리실 때 오늘의 다짐, 목표 등 한줄만 남겨주세요' },
+];
+
+// 배열 순서(자리)가 아니라 미션 고유 id로 완료 기록을 저장/조회하기 위한 헬퍼.
+// 나중에 미션 순서를 바꾸거나 새로 추가해도, id만 그대로면 기존 참가자 기록이 절대 안 섞인다.
+function missionIdAt(index){
+  const m = MISSIONS[index];
+  return m ? m.id : null;
+}
+function getLevel(index){
+  const id = missionIdAt(index);
+  if(!id || !state || !state.levels) return 0;
+  return state.levels[id] || 0;
+}
+function setLevel(index, val){
+  const id = missionIdAt(index);
+  if(!id || !state) return;
+  if(!state.levels) state.levels = {};
+  state.levels[id] = val;
+}
+
+const TOTAL_CELLS = MISSIONS.length; // START + 미션 14개 + 무인도 1개 + 이벤트 칸 4개 = 20
+const ISLAND_INDEX = MISSIONS.findIndex(m => m.isIsland);
+const isEventCell = (m) => !!(m.isIsland || m.isEvent);
+
+// 화면에 표시할 '미션 번호'(START/이벤트 칸은 번호 없이, 실제 미션만 1~14로 순번 매김)
+let __missionCounter = 0;
+const MISSION_NUMBER = MISSIONS.map((m, i) => {
+  if (i === 0 || isEventCell(m)) return null;
+  __missionCounter++;
+  return __missionCounter;
+});
+// START/이벤트 칸을 제외한 실제 미션 인덱스 목록 (완료 집계용)
+const MISSION_INDICES = MISSIONS.map((_, i) => i).filter(i => i !== 0 && !isEventCell(MISSIONS[i]));
+
+// 보드 4변 라인 보너스 그룹 (모서리 미션은 인접한 두 변에 모두 포함되어 각 변이 4개씩)
+const LINE_GROUPS = [
+  { name: '위쪽', indices: [1, 2, 4, 5] },
+  { name: '오른쪽', indices: [5, 6, 8, 9] },
+  { name: '아래쪽', indices: [11, 13, 14, 15] },
+  { name: '왼쪽', indices: [15, 17, 18, 19] },
+];
+const LINE_BONUS_POINTS = 100;
+
+// TIMP 로고 (base64로 파일 안에 내장 — 별도 이미지 파일 업로드 없이 단일 HTML로 동작)
+const LOGO_DATA_URI = 'data:image/png;base64,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';
+function miniLogoHtml(){
+  return `<img src="${LOGO_DATA_URI}" alt="TIMP" style="height:50px; width:auto; display:block;">`;
+}
+
+// 10K 훈련 프로그램 (세션3, 8/30~9/12)
+const TRAINING_10K = [
+  { week:5, date:'8/30 (일)', activity:'30분 걷기', desc:'30분 이상 산책' },
+  { week:5, date:'8/31 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:5, date:'9/1 (화)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가능한 연속으로 달리기\n- 정리 스트레칭' },
+  { week:5, date:'9/2 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:5, date:'9/3 (목)', activity:'(7분 뛰기 + 2분 걷기) × 6세트', desc:'- 준비 스트레칭 5분\n- (7분 달리기 + 2분 걷기) × 6세트\n- 정리 스트레칭' },
+  { week:5, date:'9/4 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:5, date:'9/5 (토)', activity:'40분 조깅', desc:'- 준비 스트레칭 5분\n- 40분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:6, date:'9/6 (일)', activity:'30분 걷기', desc:'30분 이상 산책' },
+  { week:6, date:'9/7 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:6, date:'9/8 (화)', activity:'4km 조깅', desc:'- 준비 스트레칭 5분\n- 4km 가능한 연속으로 달리기\n- 정리 스트레칭' },
+  { week:6, date:'9/9 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:6, date:'9/10 (목)', activity:'(8분 뛰기 + 2분 걷기) × 5세트', desc:'- 준비 스트레칭 5분\n- (8분 달리기 + 2분 걷기) × 5세트\n- 정리 스트레칭' },
+  { week:6, date:'9/11 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:6, date:'9/12 (토)', activity:'50분 조깅', desc:'- 준비 스트레칭 5분\n- 50분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+];
+
+// 하프 마라톤 훈련 프로그램 (세션3, 8/30~9/12)
+const TRAINING_HALF = [
+  { week:5, date:'8/30 (일)', activity:'15km 조깅', desc:'- 준비 스트레칭 5분\n- 15km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:5, date:'8/31 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:5, date:'9/1 (화)', activity:'7km 조깅', desc:'- 준비 스트레칭 5분\n- 7km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:5, date:'9/2 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:5, date:'9/3 (목)', activity:'조깅 30분 / 언덕 훈련 20분', desc:'- 준비 스트레칭 5분\n- 오르막 훈련전 30분 웜업으로 조깅\n- 경사가 있는 오르막 코스에서 20분 달리기\n- 오르막은 조금 빠르게 오르고 내리막은 가볍게 달리며 회복하세요\n- 정리 스트레칭' },
+  { week:5, date:'9/4 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:5, date:'9/5 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:6, date:'9/6 (일)', activity:'13km 러닝(10km 템포런 포함)', desc:'- 준비 스트레칭 5분\n- 1.5km 웜업 → 10km(약간 힘들지만 짧은 문장은 가능한 속도) → 1.5km 쿨다운\n- 정리 스트레칭' },
+  { week:6, date:'9/7 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:6, date:'9/8 (화)', activity:'6km 조깅', desc:'- 준비 스트레칭 5분\n- 6km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:6, date:'9/9 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:6, date:'9/10 (목)', activity:'7km 조깅', desc:'- 준비 스트레칭 5분\n- 7km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:6, date:'9/11 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:6, date:'9/12 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+];
+
+// 풀코스 마라톤 훈련 프로그램 (세션3, 8/30~9/12)
+const TRAINING_FULL = [
+  { week:5, date:'8/30 (일)', activity:'20km LSD', desc:'- 준비 스트레칭 5분\n- 20km 느린 페이스로 달리기\n- 정리 스트레칭\n- 달리기와 걷기를 조합해도 괜찮아요\n- 급수와 에너지젤 먹는 연습도 같이 하면 좋아요' },
+  { week:5, date:'8/31 (월)', activity:'휴식', desc:'휴식' },
+  { week:5, date:'9/1 (화)', activity:'25분 조깅', desc:'- 준비 스트레칭 5분\n- 25분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:5, date:'9/2 (수)', activity:'근력운동', desc:'스쿼트, 런지, 플랭크 등' },
+  { week:5, date:'9/3 (목)', activity:'5km 조깅 + 질주 3회', desc:'- 준비 스트레칭 5분\n- 5km 가볍게 달리기\n- (100m 질주 + 100m 회복) X 3세트\n- 정리 스트레칭' },
+  { week:5, date:'9/4 (금)', activity:'30분 조깅', desc:'- 준비 스트레칭 5분\n- 30분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:5, date:'9/5 (토)', activity:'휴식', desc:'일요일 장거리 훈련 전 완전 휴식' },
+  { week:6, date:'9/6 (일)', activity:'3시간주', desc:'- 준비 스트레칭 5분\n- 3시간 동안 느린 페이스로 달리기(시간을 채우는게 핵심)\n- 정리 스트레칭\n- 달리기와 걷기를 조합해도 괜찮아요\n- 급수와 에너지젤 먹는 연습도 같이 하면 좋아요' },
+  { week:6, date:'9/7 (월)', activity:'휴식 또는 걷기', desc:'완전 휴식' },
+  { week:6, date:'9/8 (화)', activity:'20분 조깅', desc:'- 준비 스트레칭 5분\n- 20분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:6, date:'9/9 (수)', activity:'근력운동', desc:'스쿼트, 런지, 플랭크 등' },
+  { week:6, date:'9/10 (목)', activity:'5km 조깅 + 질주 3회', desc:'- 준비 스트레칭 5분\n- 5km 가볍게 달리기\n- (100m 질주 + 100m 회복) X 3세트\n- 정리 스트레칭' },
+  { week:6, date:'9/11 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:6, date:'9/12 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+];
+
+// 세 훈련 프로그램을 공통 화면에서 재사용하기 위한 메타 정보
+// 풀코스 기록반 (세션3, 8/30~9/12) — 완주 경험자를 위한 기록 향상 플랜
+const TRAINING_FULL_RECORD = [
+  { week:5, date:'8/30 (일)', activity:'LSD 20km', desc:'- 준비 스트레칭 5분\n- 20km 편안한 페이스로 조깅 (MP+60초)\n- 정리 스트레칭' },
+  { week:5, date:'8/31 (월)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:5, date:'9/1 (화)', activity:'언덕훈련(업힐) 200m 이상×10회', desc:'- 워밍업 조깅 15분\n- 업힐 200m 이상(80% 파워)+회복×10회\n- 쿨다운 조깅 10분\n- 정리 스트레칭' },
+  { week:5, date:'9/2 (수)', activity:'회복조깅 60분', desc:'- 준비 스트레칭 5분\n- 회복조깅 60분 (MP+90~120초)\n- 정리 스트레칭' },
+  { week:5, date:'9/3 (목)', activity:'템포런 7km', desc:'- 준비 스트레칭 5분\n- 워밍업 조깅 15분\n- 템포런 7km(MP-10초)\n- 쿨다운 조깅 10분\n- 정리 스트레칭' },
+  { week:5, date:'9/4 (금)', activity:'조깅 10km', desc:'- 준비 스트레칭 5분\n- 조깅 10km (MP+60초)\n- 정리 스트레칭' },
+  { week:5, date:'9/5 (토)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:6, date:'9/6 (일)', activity:'빌드업 26km', desc:'- 준비 스트레칭 5분\n- 3km마다 10초씩 페이스업\n- 예: 서브4는 540으로 330은 450으로 마무리\n- 정리 스트레칭' },
+  { week:6, date:'9/7 (월)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:6, date:'9/8 (화)', activity:'인터벌 800m/200m 5세트', desc:'- 준비 스트레칭 5분\n- 워밍업 조깅 15분\n- 인터벌 [800m (MP-15초) + 200m 회복] X 5회\n- 쿨다운 조깅 10분\n- 정리 스트레칭' },
+  { week:6, date:'9/9 (수)', activity:'회복조깅 60분', desc:'- 준비 스트레칭 5분\n- 회복조깅 60분 (MP+90~120초)\n- 정리 스트레칭' },
+  { week:6, date:'9/10 (목)', activity:'변속주 30분', desc:'- 준비 스트레칭 5분\n- [2분 빠르게(MP-15초) + 2분 조깅] 30분 동안 반복\n- 정리 스트레칭' },
+  { week:6, date:'9/11 (금)', activity:'조깅 70분', desc:'- 준비 스트레칭 5분\n- 조깅 70분 (MP+60초)\n- 정리 스트레칭' },
+  { week:6, date:'9/12 (토)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+];
+
+const TRAINING_PROGRAMS = {
+  training10k: { data: TRAINING_10K, title: '👟 첫 10K 도전', subtitle: '8/30 ~ 9/12 · 세션3' },
+  trainingHalf: { data: TRAINING_HALF, title: '🏃 첫 하프 마라톤', subtitle: '8/30 ~ 9/12 · 세션3' },
+  trainingFull: { data: TRAINING_FULL, title: '🏃\u200d♂️ 첫 풀코스 완주', subtitle: '8/30 ~ 9/12 · 세션3' },
+  trainingFullRecord: { data: TRAINING_FULL_RECORD, title: '📈 풀코스 기록반', subtitle: '8/30 ~ 9/12 · 세션3' },
+};
+
+// 각 훈련 프로그램 안내문 (진행률 카드 아래 '여기를 먼저 눌러주세요' 버튼에서 표시)
+const PROGRAM_GUIDES = {
+  training10k: {
+    title: '👟 10K 도전 안내',
+    paragraphs: [
+      '이 프로그램은 10km 첫 완주를 목표로 하는 플랜이에요. 달리기를 시작한 누구나 이 훈련을 통해 10km를 완주할 수 있도록 도와줄 거예요.',
+      '세션3 <지구력이 쌓이는 구간>\n조깅 시간을 늘리면서 지구력을 키우는 구간입니다. 페이스는 신경 쓰지 말고 완주 자체에 집중하세요. 힘들면 잠깐씩 걸어도 전혀 문제없어요.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 토요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '뛰는 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.', 
+    ],
+  },
+  trainingHalf: {
+    title: '🏃 하프 마라톤 안내',
+    paragraphs: [
+      '이 프로그램은 하프 마라톤 첫 완주를 목표로 하는 플랜이에요. 10km를 완주해 본 러너라면, 이 훈련을 통해 하프 마라톤까지 완주할 수 있도록 도와줄 거예요.',
+      '세션3 <첫 장거리 관문을 넘는 구간>\n8/30 15km 조깅으로 거리를 늘리는 구간입니다. 거리에 익숙해지는 것이 목표니까, 힘들면 걷기도 섞어가며 완주해보세요. 이날은 급수와 에너지젤 먹는 연습도 실전처럼 함께 해보는 걸 추천해요.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 일요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '조깅 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.', 
+    ],
+  },
+  trainingFull: {
+    title: '🏃\u200d♂️ 첫 풀코스 완주 안내',
+    paragraphs: [
+      '이 프로그램은 풀코스 첫 완주를 목표로 하는 플랜이에요. 하프 마라톤을 완주해 본 러너라면, 이 훈련을 통해 풀코스까지 완주할 수 있도록 도와줄 거예요.',
+      '세션3 <장거리의 벽을 넘는 구간>\n6주차엔 3시간 동안 달리는 최장 시간 훈련이 기다려요. "몸에 장거리를 익히는 것"이 목표니, 힘들면 걷기와 달리기를 섞어도 괜찮습니다. 이 구간부터는 급수 타이밍과 에너지젤 먹는 연습도 실전처럼 함께 해보세요.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 일요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '조깅 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.', 
+    ],
+  },
+  trainingFullRecord: {
+    title: '📈 풀코스 기록반 안내',
+    paragraphs: [
+      '이 프로그램은 풀코스 기록 향상을 목표로 하는 플랜이에요. 이미 풀코스 완주 경험이 있으신 분들이 대상이며, 자신의 페이스에 맞게 적용해 훈련하시면 돼요.',
+      '세션3 <장거리의 벽을 두드리는 구간>\n인터벌이 800m까지 늘어나며, 5주차 LSD는 20km로 잠깐 낮아지지만 다음을 위한 완충 주이고, 6주차엔 다시 26km까지 끌어올립니다.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '마라톤페이스(MP): 대회 목표 페이스',
+      '조깅: MP +60초',
+      '회복 조깅: MP +90~120초',
+      '템포런: MP -10초',
+      '인터벌: MP -15~25초',
+      '질주: 최대 속도의 80%',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
+    ],
+  },
+};
+
+// 러닝마블 규칙 안내문
+const MARBLE_GUIDE = {
+  title: '🎲 러닝마블 설명',
+  paragraphs: [],
+  bullets: [
+    '러닝마블은 선택적인 특별 미션이지만, 완료 횟수와 점수에 따라 우수 마프 확률이 올라가요.',
+    '러닝마블은 하나의 탭에서만 진행해주세요. 동시에 여러 탭·기기를 사용하면 기록이 꼬일 수 있어요.',
+    '특별 미션은 기본 미션과 함께 인증해야 해요. 밴드 또는 인스타그램에 30분 이상 달리기·걷기 기록과 특별 미션 인증을 함께 올려주세요.',
+    '미션 하나를 완료하면 100점, 같은 미션을 2번째 수행하면 200점, 3번째 수행하면 300점을 획득해요 (최대 3회까지).',
+    '보드 한쪽 라인의 미션을 모두 완료하면 100점을 추가로 획득해요.',
+    '주사위는 하루에 한 번만 던질 수 있고, 출발선(START)에 도착하거나 지나치면 보너스 찬스가 1회 추가돼요.',
+    '무인도에 도착하면 주사위 2개를 던져 같은 숫자(더블)가 나와야 탈출할 수 있어요 (기회는 3번).',
+    '물음표 칸에 도착하면 7가지 이벤트 중 하나가 랜덤으로 발동해요: 앞으로 한 칸 / 앞으로 두 칸 / 뒤로 한 칸 / 뒤로 두 칸 / 출발지로 이동 / 원하는 칸으로 이동 / 무인도로 이동',
+  ],
+};
+
+
+
+/* =========================================================
+   상태
+   ========================================================= */
+function getTodayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function normalizeState(parsed){
+  if(!parsed) return null;
+  try{
+    // 이전 버전(completed 불리언 배열) 데이터 마이그레이션
+    if(parsed && !parsed.levels && parsed.completed){
+      parsed.levels = parsed.completed.map(v => v ? 1 : 0);
+      delete parsed.completed;
+    }
+    if(parsed && !parsed.dailyRolls){
+      parsed.dailyRolls = { date: getTodayStr(), count: 0 };
+    }
+    if(parsed && typeof parsed.adminMode !== 'boolean'){
+      parsed.adminMode = false;
+    }
+    if(parsed && typeof parsed.bonusRolls !== 'number'){
+      parsed.bonusRolls = 0;
+    }
+    if(parsed && typeof parsed.pendingPenalty !== 'number'){
+      parsed.pendingPenalty = 0;
+    }
+    // 목표(goal) 필드가 없는 기존 유저 대응 기본값 추가
+    if(parsed && typeof parsed.goal !== 'string'){
+      parsed.goal = '';
+    }
+    if(parsed && typeof parsed.pin !== 'string'){
+      parsed.pin = ''; // 클라우드 백업용 개인코드 (없으면 아직 백업 미설정 상태)
+    }
+    if(parsed && typeof parsed.score !== 'number'){
+      parsed.score = 0;
+    }
+    if(parsed && typeof parsed.completionUsed !== 'boolean'){
+      parsed.completionUsed = false;
+    }
+    if(parsed && !Array.isArray(parsed.lineBonusAwarded)){
+      parsed.lineBonusAwarded = LINE_GROUPS.map(()=> false);
+    }
+    if(parsed && (typeof parsed.training10k !== 'object' || parsed.training10k === null)){
+      parsed.training10k = {};
+    }
+    if(parsed && (typeof parsed.trainingHalf !== 'object' || parsed.trainingHalf === null)){
+      parsed.trainingHalf = {};
+    }
+    if(parsed && (typeof parsed.trainingFull !== 'object' || parsed.trainingFull === null)){
+      parsed.trainingFull = {};
+    }
+    if(parsed && (typeof parsed.trainingFullRecord !== 'object' || parsed.trainingFullRecord === null)){
+      parsed.trainingFullRecord = {};
+    }
+    // levels를 미션 id 기준 객체로 통일한다.
+    // - 예전 버전(배열 기반)이 남아있으면, '그 배열이 저장되던 시점의 순서'를 정확히 알 수 없으므로
+    //   최대한 앞에서부터 실제 미션 순서(MISSION_INDICES)에 맞춰 최선으로 옮겨준다.
+    // - 지금 버전부터는 항상 id 기반 객체로 저장되므로, 이후로는 미션 순서를 바꾸거나
+    //   새로 추가해도 기존 참가자 기록이 절대 안 섞인다.
+    if(parsed && Array.isArray(parsed.levels)){
+      const oldLevels = parsed.levels;
+      const newLevels = {};
+      MISSION_INDICES.forEach((idx) => {
+        const id = missionIdAt(idx);
+        if(id) newLevels[id] = oldLevels[idx] || 0;
+      });
+      parsed.levels = newLevels;
+      parsed.position = 0; // 예전 위치(배열 인덱스)는 지금 배열 순서와 안 맞을 수 있어 START로 안전하게 리셋
+    }
+    if(parsed && (typeof parsed.levels !== 'object' || parsed.levels === null)){
+      parsed.levels = {};
+    }
+    return parsed;
+  }catch(e){ return parsed; }
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    return normalizeState(JSON.parse(raw));
+  }catch(e){ return null; }
+}
+function saveState(state){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCloudSync();
+}
+function freshState(nickname, goal, pin){
+  return {
+    nickname,
+    goal: goal || '',
+    pin: pin || '', // 클라우드 백업/복구용 개인코드
+    position: 0,
+    levels: {}, // 미션 id 기준 완료 레벨 저장 (예: {icing: 2, icecream_run: 1, ...})
+    score: 0,
+    lineBonusAwarded: LINE_GROUPS.map(()=> false), // 변(라인) 보너스는 변마다 딱 1번만
+    dailyRolls: { date: getTodayStr(), count: 0 },
+    adminMode: false,
+    bonusRolls: 0,
+    pendingPenalty: 0, // 무인도 페널티를 오늘 다 못 뺐을 때 내일로 넘기는 빚
+    completionUsed: false, // 이번 도착에서 '미션 완료'를 이미 썼는지 (연타 방지)
+    training10k: {}, // 10K 훈련 프로그램 체크리스트 (day index -> boolean)
+    trainingHalf: {}, // 하프 마라톤 훈련 프로그램 체크리스트
+    trainingFull: {}, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
+    trainingFullRecord: {}, // 풀코스 기록반 훈련 프로그램 체크리스트
+    createdAt: Date.now(),
+  };
+}
+
+/* =========================================================
+   클라우드 백업 (Firestore) — score/levels는 오직 increment(더하기)로만 반영해서
+   여러 탭/기기에서 동시에 저장해도 "나중 저장이 이전 기록을 덮어쓰는" 문제가 안 생기게 한다.
+   그 외 필드(position, 체크리스트 등)는 몇 초에 한 번씩 모아서 통짜로 백업한다.
+   ========================================================= */
+function sanitizeForDocId(str){
+  return String(str || '').trim().replace(/[\/\.\#\[\]\$\s]+/g, '_').slice(0, 200) || 'anon';
+}
+function cloudDocRef(nickname, pin){
+  if(!window.__fb) return null;
+  const id = sanitizeForDocId(nickname) + '__' + sanitizeForDocId(pin);
+  return window.__fb.doc(window.__fb.db, 'participants', id);
+}
+
+// 참가자가 PIN을 처음 설정하는 순간(신규 가입 또는 기존 로컬 유저의 백업 설정)에만 호출.
+// 이 시점은 동시 접속 충돌 걱정이 없는 '최초 1회'라서 통짜로 써도 안전하다.
+async function cloudCreateInitial(st){
+  if(!window.__fb || !st.nickname || !st.pin) return;
+  try{
+    const ref = cloudDocRef(st.nickname, st.pin);
+    if(!ref) return;
+    await window.__fb.setDoc(ref, {
+      ...st, // levels는 이제 로컬에서도 미션 id 기준 객체라 그대로 저장하면 됨
+      updatedAt: window.__fb.serverTimestamp(),
+    });
+  }catch(e){ console.warn('cloud 초기 백업 실패:', e); }
+}
+
+// score/특정 미션 레벨(levels.미션id)처럼 '더하기'로만 안전하게 반영해야 하는 값들을 increment로 보낸다.
+async function cloudIncrement(fields){
+  if(!window.__fb || !state || !state.nickname || !state.pin) return;
+  const ref = cloudDocRef(state.nickname, state.pin);
+  if(!ref) return;
+  const buildUpdateObj = ()=>{
+    const obj = { updatedAt: window.__fb.serverTimestamp() };
+    Object.entries(fields).forEach(([k,v])=>{ obj[k] = window.__fb.increment(v); });
+    return obj;
+  };
+  try{
+    await window.__fb.updateDoc(ref, buildUpdateObj());
+  }catch(e){
+    // 문서가 아직 없으면 updateDoc이 실패한다. 이때 절대로 score/levels를 '통짜 값'으로 다시 쓰면 안 된다
+    // (가입 직후 빠르게 여러 미션을 연달아 완료하면, 이 복구 시도끼리 순서가 꼬여서
+    //  나중에 완료한 게 먼저 완료한 것보다 더 늦게 저장되며 서로 덮어써버리는 사고가 날 수 있다).
+    // 그래서 score/levels는 아예 건드리지 않는 '뼈대'만 먼저 만들고, 원래 하려던 increment를 다시 시도한다.
+    try{
+      const { score, levels, bonusRolls, ...rest } = state;
+      await window.__fb.setDoc(ref, { ...rest, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+      await window.__fb.updateDoc(ref, buildUpdateObj());
+    }catch(e2){ console.warn('cloud 증분 재시도 실패:', e2); }
+  }
+}
+
+// 말의 위치(position)는 다른 값들과 달리 디바운스 없이 '즉시' 저장한다.
+// (도착하자마자 뒤로가기를 누르거나 앱을 나가는 경우가 흔해서, 몇 초라도 미루면
+//  자주 유실되는 값이라 — 위치가 확정되는 그 순간 바로 클라우드에 반영한다)
+async function cloudSyncPositionNow(){
+  if(!window.__fb || !state || !state.nickname || !state.pin) return;
+  try{
+    const ref = cloudDocRef(state.nickname, state.pin);
+    if(!ref) return;
+    await window.__fb.setDoc(ref, { position: state.position, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+  }catch(e){ console.warn('cloud 위치 저장 실패:', e); }
+}
+
+// score/levels를 제외한 나머지 필드(위치, 체크리스트 등)는 저장이 발생하는 즉시 클라우드에 반영한다.
+// (디바운스 없이 매번 바로 쓰기 때문에, 몇 초 안에 여러 번 호출돼도 매번 Firestore 쓰기가 발생할 수 있다 —
+//  다만 참가자 규모상 free-tier 쓰기 한도 내로 충분히 안전하다고 판단해 즉시 저장으로 전환했다)
+function scheduleCloudSync(){
+  if(!window.__fb || !state || !state.nickname || !state.pin) return;
+  (async ()=>{
+    try{
+      const ref = cloudDocRef(state.nickname, state.pin);
+      if(!ref) return;
+      const { score, levels, bonusRolls, ...rest } = state; // score/levels/bonusRolls는 increment 전용, 통짜 덮어쓰기에서 제외
+      await window.__fb.setDoc(ref, { ...rest, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+    }catch(e){ console.warn('cloud 동기화 실패:', e); }
+  })();
+}
+
+// 닉네임+PIN으로 클라우드에서 기록을 찾아 복구한다. 성공 시 정규화된 state 객체, 실패 시 null.
+async function cloudFetchByNicknamePin(nickname, pin){
+  if(!window.__fb) return null;
+  try{
+    const ref = cloudDocRef(nickname, pin);
+    if(!ref) return null;
+    const snap = await window.__fb.getDoc(ref);
+    if(!snap.exists()) return null;
+    const data = snap.data();
+    delete data.updatedAt;
+    return normalizeState(data);
+  }catch(e){ console.warn('cloud 복구 실패:', e); return null; }
+}
+
+
+// 날짜가 바뀌었으면 오늘의 주사위 횟수를 리셋한다. 전날 넘어온 무인도 페널티가 있으면 반영한다.
+function ensureDailyRollsFresh(){
+  const today = getTodayStr();
+  if(!state.dailyRolls || state.dailyRolls.date !== today){
+    const debt = state.pendingPenalty || 0;
+    state.dailyRolls = { date: today, count: Math.min(debt, MAX_ROLLS_PER_DAY) };
+    state.pendingPenalty = Math.max(0, debt - MAX_ROLLS_PER_DAY);
+    saveState(state);
+  }
+}
+function getRollsLeft(){
+  ensureDailyRollsFresh();
+  return Math.max(0, MAX_ROLLS_PER_DAY - state.dailyRolls.count);
+}
+
+/* =========================================================
+   관리자 모드 (닉네임 타이틀을 짧은 시간 안에 5번 연속 탭) — 테스트 파일 전용
+   ========================================================= */
+let adminTapCount = 0;
+let adminTapTimer = null;
+const ADMIN_TAP_TARGET = 5;
+const ADMIN_TAP_WINDOW = 700; // ms
+
+function handleAdminTap(){
+  adminTapCount++;
+  if(adminTapTimer) clearTimeout(adminTapTimer);
+  adminTapTimer = setTimeout(()=>{ adminTapCount = 0; }, ADMIN_TAP_WINDOW);
+
+  if(adminTapCount >= ADMIN_TAP_TARGET){
+    adminTapCount = 0;
+    clearTimeout(adminTapTimer);
+    state.adminMode = !state.adminMode;
+    saveState(state);
+    showToast(state.adminMode ? '🔓 관리자 모드 ON — 주사위 무제한' : '🔒 관리자 모드 OFF', 1800);
+    renderGame();
+  }
+}
+
+let state = loadState();
+
+/* =========================================================
+   보드 좌표 계산 (둥근 사각 트랙 둘레에 15칸 균등 배치)
+   ========================================================= */
+function getPointOnTrack(index, total){
+  // 정사각 둘레를 시계방향으로 균등 분할, 위쪽 중앙에서 시작
+  const perim = 4; // 정규화된 한 변 길이 1 기준 둘레 4
+  const t = (index / total) * perim;
+  const half = 0.5;
+  let x, y;
+  if(t < 1){ // 위쪽 변: 왼쪽->오른쪽
+    x = -half + t; y = -half;
+  } else if(t < 2){ // 오른쪽 변: 위->아래
+    x = half; y = -half + (t-1);
+  } else if(t < 3){ // 아래쪽 변: 오른쪽->왼쪽
+    x = half - (t-2); y = half;
+  } else { // 왼쪽 변: 아래->위
+    x = -half; y = half - (t-3);
+  }
+  return { xPct: (x+half)*100, yPct: (y+half)*100 };
+}
+
+/* =========================================================
+   렌더링
+   ========================================================= */
+const app = document.getElementById('app');
+
+let currentView = 'hub'; // 'hub' | 'marble' | 'wip'
+let wipTitle = '';
+
+function render(){
+  if(!state){
+    renderOnboarding();
+    return;
+  }
+  if(currentView === 'marble') renderGame();
+  else if(TRAINING_PROGRAMS[currentView]) renderTrainingProgram(currentView);
+  else if(currentView === 'wip') renderWorkInProgress();
+  else renderHub();
+}
+
+function goToHub(){
+  currentView = 'hub';
+  render();
+}
+
+function renderOnboarding(){
+  app.innerHTML = `
+    <div class="fade-in flex flex-col items-center justify-center" style="min-height:80vh;">
+      <img src="${LOGO_DATA_URI}" alt="TIMP - This is my pace" style="width:200px; height:auto; margin-bottom:20px;">
+      <h1 class="font-display text-2xl font-bold text-center leading-snug">마라닉 프렌즈 9기 세션3</h1>
+      <div class="w-full mt-10 rounded-3xl p-6" style="background:var(--bg-elev); border:1px solid var(--line);">
+        <label class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">닉네임을 입력해주세요</label>
+        <input id="nickname-input" type="text" maxlength="20" placeholder="마피아런 또는 인스타그램 계정"
+          class="w-full mt-2 mb-4 px-4 py-3 rounded-xl outline-none text-base"
+          style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+
+        <label class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">개인 코드 (숫자 4자리)</label>
+        <input id="pin-input" type="tel" inputmode="numeric" maxlength="4" placeholder="예: 1234"
+          class="w-full mt-2 mb-4 px-4 py-3 rounded-xl outline-none text-base"
+          style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+        <p class="text-xs -mt-3 mb-4" style="color:var(--text-dim)">기기를 바꾸거나 기록이 사라졌을 때 복구하는 데 쓰여요. 꼭 기억해두세요!</p>
+
+        <button id="start-btn" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">
+          마라닉 프렌즈 9기 시작하기
+        </button>
+        <p class="text-xs mt-3 text-center" style="color:var(--text-dim)">닉네임+개인코드로 다른 기기·브라우저에서도 기록을 불러올 수 있어요.</p>
+        <a href="https://open.kakao.com/o/ssVl6nGi" target="_blank" rel="noopener noreferrer"
+          class="block w-full mt-3 text-xs text-center underline" style="color:var(--text-dim);">
+          닉네임 또는 PIN를 잊어버리셨나요? 관리자에게 문의해주세요
+        </a>
+      </div>
+    </div>
+  `;
+
+  const nicknameInput = document.getElementById('nickname-input');
+  const pinInput = document.getElementById('pin-input');
+  const btn = document.getElementById('start-btn');
+  const submit = async ()=>{
+    const nickVal = nicknameInput.value.trim();
+    const pinVal = pinInput.value.trim();
+    if(!nickVal){ nicknameInput.focus(); nicknameInput.style.borderColor = 'var(--sunset-1)'; return; }
+    if(!/^\d{4}$/.test(pinVal)){ pinInput.focus(); pinInput.style.borderColor = 'var(--sunset-1)'; return; }
+
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = '확인 중...';
+
+    // 같은 닉네임+코드로 이미 진행 중인 기록이 있는지 먼저 확인한다.
+    // (참가자가 실수로 또는 습관적으로 '시작하기'를 다시 눌러도, 기존 기록이 지워지지 않고
+    //  자동으로 이어서 하도록 하기 위한 안전장치)
+    const existing = await cloudFetchByNicknamePin(nickVal, pinVal);
+    if(existing){
+      state = existing;
+      saveState(state);
+      showToast('☁️ 기존 기록을 불러왔어요');
+      render();
+      return;
+    }
+
+    state = freshState(nickVal, '', pinVal); // 목표는 이제 허브 화면에서 설정
+    saveState(state);
+    cloudCreateInitial(state); // 최초 1회이므로 통짜로 저장해도 안전함
+    render();
+  };
+  btn.addEventListener('click', submit);
+  nicknameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') pinInput.focus(); });
+  pinInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  nicknameInput.focus();
+}
+
+/* =========================================================
+   이전 기록 불러오기 (닉네임 + 개인코드로 클라우드에서 복구)
+   ========================================================= */
+function openRestoreModal(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">☁️ 이전 기록 불러오기</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-xs mt-2" style="color:var(--text-dim)">처음 시작할 때 입력했던 닉네임과 개인 코드를 똑같이 입력해주세요.</p>
+      <label class="text-xs font-semibold tracking-wide uppercase mt-4 block" style="color:var(--text-dim)">닉네임</label>
+      <input id="restore-nickname-input" type="text" maxlength="20"
+        class="w-full mt-2 mb-4 px-4 py-3 rounded-xl outline-none text-base"
+        style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+      <label class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">개인 코드 (숫자 4자리)</label>
+      <input id="restore-pin-input" type="tel" inputmode="numeric" maxlength="4"
+        class="w-full mt-2 px-4 py-3 rounded-xl outline-none text-base"
+        style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+      <p id="restore-error" class="text-xs mt-2" style="color:var(--sunset-1); display:none;">일치하는 기록을 찾지 못했어요. 닉네임과 코드를 다시 확인해주세요.</p>
+      <button id="restore-submit-btn" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">
+        불러오기
+      </button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+
+  const nickInput = backdrop.querySelector('#restore-nickname-input');
+  const pinInput = backdrop.querySelector('#restore-pin-input');
+  const errorMsg = backdrop.querySelector('#restore-error');
+  const submitBtn = backdrop.querySelector('#restore-submit-btn');
+
+  submitBtn.addEventListener('click', async ()=>{
+    const nickVal = nickInput.value.trim();
+    const pinVal = pinInput.value.trim();
+    errorMsg.style.display = 'none';
+    if(!nickVal || !/^\d{4}$/.test(pinVal)){
+      errorMsg.textContent = '닉네임과 4자리 코드를 정확히 입력해주세요.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = '불러오는 중...';
+    const restored = await cloudFetchByNicknamePin(nickVal, pinVal);
+    if(!restored){
+      errorMsg.textContent = '일치하는 기록을 찾지 못했어요. 닉네임과 코드를 다시 확인해주세요.';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = '불러오기';
+      return;
+    }
+    state = restored;
+    saveState(state);
+    close();
+    render();
+  });
+}
+
+/* =========================================================
+   목표 설정/수정 (허브 화면 목표 카드에서 호출)
+   ========================================================= */
+function openGoalEditModal(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">🎯 나의 목표</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <label class="text-xs font-semibold tracking-wide uppercase mt-4 block" style="color:var(--text-dim)">마라닉 프렌즈 9기 목표</label>
+      <input id="goal-edit-input" type="text" maxlength="40" placeholder="10km 완주하기, 3kg 감량하기 등 자유롭게"
+        value="${escapeHtml(state.goal || '')}"
+        class="w-full mt-2 px-4 py-3 rounded-xl outline-none text-base"
+        style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+      <button id="goal-save-btn" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">저장하기</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  const input = backdrop.querySelector('#goal-edit-input');
+  const save = ()=>{
+    state.goal = input.value.trim();
+    saveState(state);
+    close();
+    renderHub();
+  };
+  backdrop.querySelector('#goal-save-btn').addEventListener('click', save);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') save(); });
+  input.focus();
+}
+
+/* =========================================================
+   허브 화면 (마라닉프렌즈 9기 메인) — 닉네임/목표 + 2x2 프로그램 카드
+   ========================================================= */
+function renderHub(){
+  app.innerHTML = `
+    <div class="fade-in">
+      <div class="mb-4 flex justify-center">${miniLogoHtml()}</div>
+      <div class="text-center mt-2 mb-8">
+        <p class="text-xl font-semibold tracking-wide uppercase" style="color:var(--text)">마라닉프렌즈 9기 세션3</p>
+        <h1 class="font-display text-2xl font-bold mt-1">
+          <span class="sunset-text">${escapeHtml(state.nickname)}</span>님
+        </h1>
+      </div>
+
+      <button id="goal-edit-btn" type="button" class="w-full text-left rounded-2xl p-4 mb-8" style="background:var(--bg-elev); border:1px solid var(--line);">
+        <div class="flex items-center justify-between">
+          <p class="text-xs" style="color:var(--text-dim)">🎯 나의 목표</p>
+          <span class="text-xs font-semibold" style="color:var(--sunset-1)">${state.goal ? '수정' : '설정하기'}</span>
+        </div>
+        <p class="font-medium mt-1 truncate" style="color:var(--text)">${state.goal ? escapeHtml(state.goal) : '아직 목표를 정하지 않았어요'}</p>
+      </button>
+
+      ${!state.pin ? `
+      <button id="setup-backup-btn" type="button" class="w-full mb-8 rounded-2xl p-4 flex items-center gap-3 text-left"
+        style="background:var(--level4-dim); border:1px solid var(--level4);">
+        <span style="font-size:22px;">☁️</span>
+        <span>
+          <span class="block text-sm font-bold" style="color:var(--text)">기록 백업이 아직 안 돼있어요</span>
+          <span class="block text-xs mt-0.5" style="color:var(--text-dim)">캐시를 지우거나 기기를 바꾸면 기록이 사라져요. 눌러서 백업해두세요!</span>
+        </span>
+      </button>
+      ` : ''}
+
+      <div class="grid grid-cols-2 gap-4">
+        <button type="button" class="hub-card" data-target="trainingFull" data-title="풀코스 마라톤 완주반">
+          <span class="hub-card-emoji">🏁</span>
+          <span class="hub-card-label">풀코스 마라톤</span>
+          <span class="hub-card-desc">첫 완주 플랜</span>
+        </button>
+        <button type="button" class="hub-card" data-target="trainingFullRecord" data-title="풀코스 마라톤 기록반">
+          <span class="hub-card-emoji">📈</span>
+          <span class="hub-card-label">풀코스 기록반</span>
+          <span class="hub-card-desc">기록 향상 플랜</span>
+        </button>
+        <button type="button" class="hub-card" data-target="trainingHalf" data-title="하프 완주반">
+          <span class="hub-card-emoji">🏃</span>
+          <span class="hub-card-label">하프마라톤</span>
+          <span class="hub-card-desc">첫 완주 플랜</span>
+        </button>
+        <button type="button" class="hub-card" data-target="training10k" data-title="10K">
+          <span class="hub-card-emoji">👟</span>
+          <span class="hub-card-label">10K</span>
+          <span class="hub-card-desc">10km 첫 완주 플랜</span>
+        </button>
+      </div>
+
+      <button type="button" class="hub-card hub-card-wide mt-4" data-target="marble" data-title="러닝마블">
+        <span class="hub-card-emoji">🎲</span>
+        <span class="hub-card-text">
+          <span class="hub-card-label">러닝마블</span>
+          <span class="hub-card-desc">완료할수록 우수 마프 확률 UP!!</span>
+        </span>
+      </button>
+
+      <div class="mt-10 flex justify-center">
+        <button id="reset-btn-bottom" class="text-xs px-4 py-2 rounded-full"
+          style="color:var(--text-dim); border:1px solid var(--line); background:transparent;">
+          로그아웃
+        </button>
+      </div>
+    </div>
+  `;
+
+  const setupBackupBtn = document.getElementById('setup-backup-btn');
+  if(setupBackupBtn) setupBackupBtn.addEventListener('click', openSetupPinModal);
+  document.getElementById('goal-edit-btn').addEventListener('click', openGoalEditModal);
+  document.getElementById('reset-btn-bottom').addEventListener('click', confirmReset);
+  document.querySelectorAll('.hub-card').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(btn.dataset.target === 'marble'){
+        currentView = 'marble';
+      } else if(TRAINING_PROGRAMS[btn.dataset.target]){
+        currentView = btn.dataset.target;
+      } else {
+        currentView = 'wip';
+        wipTitle = btn.dataset.title;
+      }
+      render();
+    });
+  });
+}
+
+/* =========================================================
+   작업중 화면 (풀코스 마라톤/하프 마라톤/10K)
+   ========================================================= */
+function renderWorkInProgress(){
+  app.innerHTML = `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-8">
+        <button id="wip-back-btn" title="뒤로가기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">←</button>
+        ${miniLogoHtml()}
+        <div class="w-9"></div>
+      </div>
+      <div class="flex flex-col items-center justify-center text-center" style="min-height:55vh;">
+        <div class="text-5xl mb-4">🚧</div>
+        <h1 class="font-display text-xl font-bold">${escapeHtml(wipTitle)}</h1>
+        <p class="text-sm mt-3 leading-relaxed" style="color:var(--text-dim)">훈련 프로그램을 준비 중이에요.<br>조금만 기다려주세요!</p>
+      </div>
+    </div>
+  `;
+  document.getElementById('wip-back-btn').addEventListener('click', goToHub);
+}
+
+/* =========================================================
+   훈련 프로그램 화면 (10K / 하프 마라톤 / 풀코스 마라톤 공용)
+   ========================================================= */
+function renderTrainingProgram(programKey){
+  const program = TRAINING_PROGRAMS[programKey];
+  const days = program.data;
+  const checks = state[programKey];
+  const doneCount = days.filter((_,i)=> !!checks[i]).length;
+  const weeks = [5, 6];
+
+  const weekHtml = weeks.map(w=>{
+    const rows = days.map((day, i)=>{
+      if(day.week !== w) return '';
+      const done = !!checks[i];
+      return `
+        <div class="training-row ${done ? 'done' : ''}" data-idx="${i}">
+          <button type="button" class="training-check" data-check-idx="${i}" aria-label="완료 체크">
+            ${done ? '✅' : ''}
+          </button>
+          <div class="training-row-text" data-info-idx="${i}">
+            <p class="training-date">${escapeHtml(day.date)}</p>
+            <p class="training-activity">${escapeHtml(day.activity)}</p>
+          </div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="mt-6">
+        <p class="text-xs font-bold tracking-wide uppercase mb-2" style="color:var(--text-dim)">${w}주차</p>
+        <div class="rounded-2xl overflow-hidden" style="border:1px solid var(--line);">${rows}</div>
+      </div>
+    `;
+  }).join('');
+
+  app.innerHTML = `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-8">
+        <button id="training-back-btn" title="뒤로가기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">←</button>
+        ${miniLogoHtml()}
+        <div class="w-9"></div>
+      </div>
+
+      <h1 class="font-display text-xl font-bold text-center">${program.title}</h1>
+      <p class="text-xs text-center mt-1" style="color:var(--text-dim)">${program.subtitle}</p>
+
+      <button id="program-guide-btn" type="button" class="w-full mt-6 py-2.5 rounded-xl text-xs font-bold"
+        style="background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
+        👉 여기를 먼저 눌러주세요
+      </button>
+
+      <div class="mt-4 rounded-2xl p-4" style="background:var(--bg-elev); border:1px solid var(--line);">
+        <div class="flex items-center justify-between text-xs mb-2">
+          <span style="color:var(--text-dim)">진행률</span>
+          <span class="font-display font-bold sunset-text">${doneCount} / ${days.length}</span>
+        </div>
+        <div class="w-full h-2 rounded-full overflow-hidden" style="background:var(--bg-elev-2)">
+          <div class="h-full rounded-full" style="width:${Math.round(doneCount/days.length*100)}%; background:linear-gradient(90deg,var(--sunset-1),var(--sunset-2)); transition:width .4s ease;"></div>
+        </div>
+      </div>
+
+      ${weekHtml}
+    </div>
+  `;
+
+  document.getElementById('training-back-btn').addEventListener('click', goToHub);
+  document.getElementById('program-guide-btn').addEventListener('click', ()=> openProgramGuide(programKey));
+
+  // 체크박스를 눌러도 바로 체크되지 않고, 날짜 클릭과 동일하게 먼저 훈련 내용을 보여준다.
+  // (거기서 '완료 체크하기'를 눌러야 실제로 체크됨)
+  document.querySelectorAll('.training-check[data-check-idx]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const i = parseInt(btn.dataset.checkIdx, 10);
+      openTrainingDayInfo(programKey, i);
+    });
+  });
+
+  document.querySelectorAll('.training-row-text[data-info-idx]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i = parseInt(el.dataset.infoIdx, 10);
+      openTrainingDayInfo(programKey, i);
+    });
+  });
+}
+
+// 문단/불릿 형태의 안내문을 공용 팝업으로 띄운다 (훈련 프로그램 안내, 러닝마블 규칙 안내 등에서 재사용)
+function openGuideModal(guide){
+  const paragraphsHtml = (guide.paragraphs || [])
+    .map(p => `<p class="text-sm leading-relaxed" style="color:var(--text-dim)">${escapeHtmlMultiline(p)}</p>`)
+    .join('');
+  const bulletsHtml = (guide.bullets || []).length ? `
+    <ul class="mt-3" style="padding-left:0; list-style:none;">
+      ${guide.bullets.map(b => `
+        <li class="text-sm leading-relaxed mt-2" style="color:var(--text-dim); display:flex; gap:6px;">
+          <span style="color:var(--sunset-1); flex-shrink:0;">•</span><span>${escapeHtmlMultiline(b)}</span>
+        </li>
+      `).join('')}
+    </ul>
+  ` : '';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">${escapeHtml(guide.title)}</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <div class="mt-4">${paragraphsHtml}${bulletsHtml}</div>
+      <button id="modal-confirm" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">확인</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', close);
+}
+
+function openProgramGuide(programKey){
+  openGuideModal(PROGRAM_GUIDES[programKey]);
+}
+
+function openMarbleGuide(){
+  openGuideModal(MARBLE_GUIDE);
+}
+
+// '나의 러닝마블 내역' — 주사위(오늘 사용 횟수/보너스), 미션별 완료 횟수, 총점수를 한눈에 모아 보여준다.
+function openMarbleHistoryModal(){
+  const rollsLeft = getRollsLeft();
+  const bonusRolls = state.bonusRolls || 0;
+  const todayUsed = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
+
+  const missionRows = MISSION_INDICES.map(i=>{
+    const m = MISSIONS[i];
+    const lvl = getLevel(i);
+    if(lvl <= 0) return '';
+    return `
+      <div class="flex items-center justify-between text-sm py-2" style="border-bottom:1px solid var(--line);">
+        <span style="color:var(--text)">${m.emoji} ${escapeHtml(m.title)}</span>
+        <span class="font-display font-bold" style="color:var(--level4)">${lvl}회</span>
+      </div>
+    `;
+  }).join('');
+  const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">📜 나의 러닝마블 내역</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+
+      <div class="mt-4 rounded-2xl p-4 grid grid-cols-3 gap-2 text-center" style="background:var(--bg-elev-2);">
+        <div>
+          <p class="text-[10px]" style="color:var(--text-dim)">총점수</p>
+          <p class="font-display font-bold text-lg" style="color:var(--level4)">${state.score || 0}점</p>
+        </div>
+        <div>
+          <p class="text-[10px]" style="color:var(--text-dim)">총 완료</p>
+          <p class="font-display font-bold text-lg sunset-text">${totalCompletions}회</p>
+        </div>
+        <div>
+          <p class="text-[10px]" style="color:var(--text-dim)">보너스 주사위</p>
+          <p class="font-display font-bold text-lg" style="color:var(--text)">${bonusRolls}개</p>
+        </div>
+      </div>
+
+      <p class="text-xs mt-4" style="color:var(--text-dim)">오늘 주사위: ${todayUsed}번 사용 · ${rollsLeft > 0 ? rollsLeft + '번 더 굴릴 수 있어요' : '오늘 기본 횟수는 다 썼어요'}</p>
+
+      <div class="mt-4">
+        <p class="text-xs font-bold tracking-wide uppercase mb-1" style="color:var(--text-dim)">미션별 완료 내역</p>
+        ${missionRows ? `<div>${missionRows}</div>` : `<p class="text-sm mt-2" style="color:var(--text-dim)">아직 완료한 미션이 없어요. 주사위를 굴려서 시작해보세요!</p>`}
+      </div>
+
+      <button id="modal-confirm" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">확인</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', close);
+}
+
+function openTrainingDayInfo(programKey, i){
+  const program = TRAINING_PROGRAMS[programKey];
+  const day = program.data[i];
+  const done = !!state[programKey][i];
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">${escapeHtml(day.date)}</p>
+          <h2 class="font-display text-xl font-bold mt-1">${escapeHtml(day.activity)}</h2>
+        </div>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">${escapeHtmlMultiline(day.desc)}</p>
+      <div class="flex gap-3 mt-6">
+        <button id="training-toggle-btn" class="flex-1 py-3 rounded-xl font-display font-bold text-sm ${done ? '' : 'track-btn text-white'}"
+          style="${done ? 'background:var(--complete-dim); color:var(--complete); border:1px solid var(--complete);' : ''}">
+          ${done ? '✅ 완료 취소하기' : '완료 체크하기'}
+        </button>
+        <button id="modal-confirm" class="flex-1 py-3 rounded-xl font-display font-bold text-sm"
+          style="background:var(--bg-elev-2); color:var(--text);">확인</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', close);
+  backdrop.querySelector('#training-toggle-btn').addEventListener('click', ()=>{
+    state[programKey][i] = !state[programKey][i];
+    saveState(state);
+    close();
+    renderTrainingProgram(programKey);
+  });
+}
+
+/* =========================================================
+   닉네임 / 목표 수정 모달 (언제든지 변경 가능)
+   ========================================================= */
+/* =========================================================
+   기존 로컬 유저용: 개인 코드(PIN) 설정하고 지금까지의 기록을 클라우드에 백업
+   ========================================================= */
+function openSetupPinModal(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">☁️ 기록 백업 설정</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-xs mt-2 leading-relaxed" style="color:var(--text-dim)">개인 코드(숫자 4자리)를 정해주세요. 나중에 기기를 바꾸거나 캐시가 지워졌을 때, 닉네임(${escapeHtml(state.nickname)})과 이 코드로 지금까지의 기록을 그대로 불러올 수 있어요. 꼭 기억해두세요!</p>
+      <label class="text-xs font-semibold tracking-wide uppercase mt-4 block" style="color:var(--text-dim)">개인 코드 (숫자 4자리)</label>
+      <input id="setup-pin-input" type="tel" inputmode="numeric" maxlength="4" placeholder="예: 1234"
+        class="w-full mt-2 px-4 py-3 rounded-xl outline-none text-base"
+        style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+      <button id="setup-pin-submit" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">
+        백업 설정 완료
+      </button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+
+  const pinInput = backdrop.querySelector('#setup-pin-input');
+  backdrop.querySelector('#setup-pin-submit').addEventListener('click', ()=>{
+    const pinVal = pinInput.value.trim();
+    if(!/^\d{4}$/.test(pinVal)){ pinInput.focus(); pinInput.style.borderColor = 'var(--sunset-1)'; return; }
+    state.pin = pinVal;
+    saveState(state);
+    cloudCreateInitial(state); // 지금까지의 기록을 그대로 최초 백업 (최초 1회라 통짜 저장 안전함)
+    showToast('☁️ 백업이 설정됐어요!');
+    close();
+    renderHub();
+  });
+  pinInput.focus();
+}
+
+function renderGame(){
+  const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0); // 중복 포함 총 완료 횟수
+  const allMastered = MISSION_INDICES.every(i => getLevel(i) >= MAX_LEVEL);
+  const rollsLeft = getRollsLeft();
+  const bonusRolls = state.bonusRolls || 0;
+  const canStillRoll = rollsLeft > 0 || bonusRolls > 0;
+  const notStartedYet = false; // 테스트 모드이므로 시작일 제한을 해제해뒀어요 (실 운영 전 CAMPAIGN_START_DATE 로직 복원 필요)
+
+  app.innerHTML = `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <button id="marble-back-btn" title="뒤로가기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">←</button>
+        ${miniLogoHtml()}
+        <button id="marble-refresh-btn" title="최신 정보 확인하기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">⟳</button>
+      </div>
+      <h1 id="dashboard-title" class="font-display text-lg font-bold text-center mb-8" style="user-select:none;">
+        <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:var(--text-dim); font-size:0.7em;">세션3</span>
+      </h1>
+
+      <button id="marble-guide-btn" type="button" class="w-full mb-2 py-2.5 rounded-xl text-xs font-bold"
+        style="background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
+        📖 러닝마블 설명을 꼭 읽어주세요!
+      </button>
+
+      <button id="marble-history-btn" type="button" class="w-full mb-4 py-2.5 rounded-xl text-xs font-bold"
+        style="background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text);">
+        📜 나의 러닝마블 내역 보기
+      </button>
+
+      <div class="mb-16 rounded-2xl p-4 flex items-center justify-between gap-4" style="background:var(--bg-elev); border:1px solid var(--line);">
+        <div>
+          <span class="text-xs" style="color:var(--text-dim)">총 완료 개수</span>
+          <div id="progress-count" class="font-display text-2xl font-bold sunset-text">${totalCompletions}<span class="text-sm font-semibold" style="color:var(--text-dim)"> 회</span></div>
+        </div>
+        <div class="text-right">
+          <span class="text-xs" style="color:var(--text-dim)">점수</span>
+          <div id="progress-score" class="font-display text-2xl font-bold" style="color:var(--level4)">${state.score || 0}<span class="text-sm font-semibold" style="color:var(--text-dim)"> 점</span></div>
+        </div>
+      </div>
+
+      <div id="board-wrap">
+        <div id="board-field"></div>
+        <div class="lane-outline"></div>
+        <div id="cells-layer"></div>
+        <div id="token"><div id="token-glow"></div><span style="position:relative;z-index:1;">🏃</span></div>
+
+        <div id="board-help" style="position:absolute; left:50%; top:135%; transform:translate(-50%,-50%); width:80%; z-index:3; text-align:center;">
+          <p class="text-[10px]" style="color:var(--text-dim);">러닝마블은 하나의 탭에서만 진행해주세요<br>(동시에 여러 탭 사용 시 기록이 꼬일 수 있어요)</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">각 이모티콘을 누르면 미션을 확인할 수 있어요</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">주사위는 하루에 1번만 굴릴 수 있어요</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">🏁 START를 밟거나 지나치면 주사위보너스 +1</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">(보너스 주사위로 하루에 2회 이상 미션을 할 수 있어요)</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">❓물음표는 7가지 이벤트가 랜덤으로 나와요</p>
+          <p class="text-[10px] mt-1" style="color:var(--text-dim); white-space:nowrap;">🏝️ 무인도는 3번 안에 더블이 나와야 탈출해요</p>
+        </div>
+
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:3;">
+          ${state.adminMode ? `
+            <div id="dice1" class="die"></div>
+            <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm">
+              주사위 던지기
+            </button>
+            <p class="text-xs" style="color:var(--text-dim)">🔓 관리자 모드 · 무제한</p>
+          ` : notStartedYet ? `
+            <div class="text-3xl">🗓️</div>
+            <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm" disabled style="opacity:.4; cursor:not-allowed;">
+              주사위 던지기
+            </button>
+            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">세션3 러닝마블은 8월 30일부터<br>시작할 수 있어요</p>
+          ` : allMastered ? `
+            <div class="text-3xl">🏆</div>
+            <p class="font-display font-bold text-sm text-center px-4" style="color:var(--complete)">모든 미션 마스터!</p>
+          ` : canStillRoll ? `
+            <div id="dice1" class="die"></div>
+            <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm">
+              주사위 던지기
+            </button>
+            <p class="text-xs text-center" style="color:var(--text-dim)">
+              ${rollsLeft > 0 ? `오늘 ${rollsLeft}/${MAX_ROLLS_PER_DAY}번 남음` : '오늘 기본 횟수 소진'}
+              ${bonusRolls > 0 ? ` · 🎁 보너스 ${bonusRolls}개` : ''}
+            </p>
+          ` : `
+            <div id="dice1" class="die"></div>
+            <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm" disabled>
+              주사위 던지기
+            </button>
+            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">오늘의 주사위 사용 완료<br>내일 다시 도전해보세요</p>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+
+  renderCells();
+  positionToken(state.position, false);
+  if(!notStartedYet && (state.adminMode || !allMastered)) renderDicePips(1, 'dice1');
+
+  const rollBtn = document.getElementById('roll-btn');
+  if(rollBtn) rollBtn.addEventListener('click', handleRollClick);
+  document.getElementById('marble-back-btn').addEventListener('click', goToHub);
+  document.getElementById('marble-refresh-btn').addEventListener('click', handleManualRefresh);
+  document.getElementById('marble-guide-btn').addEventListener('click', openMarbleGuide);
+  document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
+  document.getElementById('dashboard-title').addEventListener('click', handleAdminTap);
+}
+
+function renderCells(){
+  const layer = document.getElementById('cells-layer');
+  layer.innerHTML = '';
+  for(let i=0;i<TOTAL_CELLS;i++){
+    const { xPct, yPct } = getPointOnTrack(i, TOTAL_CELLS);
+    const mission = MISSIONS[i];
+    const isStart = i===0;
+    const isIsland = !!mission.isIsland;
+    const isRandomEvent = !!mission.isEvent; // 응원/선물/물음표가 통합된 랜덤 이벤트 칸
+    const isEvent = isEventCell(mission); // 무인도 + 랜덤 이벤트 칸 전부 포함
+    const level = getLevel(i);
+    const div = document.createElement('div');
+    let cls = 'cell';
+    if(isStart) cls += ' start';
+    else if(isIsland) cls += ' island';
+    else if(isRandomEvent) cls += ' event';
+    else if(level >= 1) cls += ` lvl${Math.min(level, MAX_LEVEL)}`;
+    if(i === state.position) cls += ' current';
+    div.className = cls;
+    div.style.left = xPct + '%';
+    div.style.top = yPct + '%';
+
+    // 완료할 때마다(1회=1개 ~ 5회=5개) 이모티콘을 하나씩 더 보여준다. (START/이벤트 칸은 항상 1개)
+    const emojiCount = (isStart || isEvent) ? 1 : Math.max(1, Math.min(level, MAX_LEVEL));
+    const emojiSize = emojiCount<=1 ? 20 : emojiCount===2 ? 16 : emojiCount===3 ? 13 : emojiCount===4 ? 11 : 9;
+    // 랜덤 이벤트 칸은 실제 효과를 숨기기 위해 항상 검정 물음표만 보여준다 (도착해야만 어떤 효과인지 알 수 있음)
+    const emojiHtml = isRandomEvent ? '?' : mission.emoji.repeat(emojiCount);
+    const numLabel = (isStart || isEvent) ? '' : MISSION_NUMBER[i];
+
+    div.innerHTML = `
+      <span class="cell-emoji" style="font-size:${emojiSize}px;">${emojiHtml}</span>
+      ${(!isStart && !isEvent && level >= 1) ? '<span class="cell-check">✅</span>' : ''}
+    `;
+    // 랜덤 이벤트 칸은 클릭해도 아무 반응이 없다 (미리보기 금지 — 도착해야만 효과를 알 수 있음)
+    if(!isRandomEvent){
+      div.addEventListener('click', ()=> openMission(i));
+    }
+    layer.appendChild(div);
+  }
+}
+
+function positionToken(index, animate){
+  const token = document.getElementById('token');
+  const { xPct, yPct } = getPointOnTrack(index, TOTAL_CELLS);
+  if(!animate){ token.style.transitionDuration = '0s'; }
+  token.style.left = xPct + '%';
+  token.style.top = yPct + '%';
+  if(!animate){
+    requestAnimationFrame(()=>{ token.style.transitionDuration = ''; });
+  }
+}
+
+function renderDicePips(n, elId){
+  const dice = document.getElementById(elId || 'dice1');
+  if(!dice) return;
+  const layouts = {
+    1:[0,0,0,0,1,0,0,0,0],
+    2:[1,0,0,0,0,0,0,0,1],
+    3:[1,0,0,0,1,0,0,0,1],
+    4:[1,0,1,0,0,0,1,0,1],
+    5:[1,0,1,0,1,0,1,0,1],
+    6:[1,0,1,1,0,1,1,0,1],
+  };
+  const layout = layouts[n] || layouts[1];
+  dice.innerHTML = layout.map(v=>`<div class="pip ${v?'on':''}"></div>`).join('');
+}
+function renderDicePair(n1, n2){
+  renderDicePips(n1, 'dice1');
+  renderDicePips(n2, 'dice2');
+}
+
+function refreshProgress(){
+  const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0);
+  const countEl = document.getElementById('progress-count');
+  if(countEl) countEl.innerHTML = `${totalCompletions}<span class="text-sm font-semibold" style="color:var(--text-dim)"> 회</span>`;
+  const scoreEl = document.getElementById('progress-score');
+  if(scoreEl) scoreEl.innerHTML = `${state.score || 0}<span class="text-sm font-semibold" style="color:var(--text-dim)"> 점</span>`;
+  const allMastered = MISSION_INDICES.every(i => getLevel(i) >= MAX_LEVEL);
+  // 모든 칸이 3단계(빨강)까지 마스터되면 주사위 영역을 완주 화면으로 전환
+  if(allMastered){
+    renderGame();
+  }
+}
+
+/* =========================================================
+   주사위 & 이동
+   ========================================================= */
+let isRolling = false;
+
+function getValidRolls(){
+  // 평소 이동은 주사위 1개(1~6)만 사용한다. (무인도 탈출 미니게임에서만 별도로 2개를 굴림)
+  // 전체를 2배로 스케일링하고 이벤트 칸만 절반 가중치를 줘서, 이벤트 칸에 도착할 확률만 기존의 절반으로 낮췄다.
+  const W_UNVISITED = 6; // 아직 한 번도 안 나온 미션 칸 (그래도 가장 잘 나오게)
+  const W_REVISIT   = 4; // 이미 밟았지만 마스터 전인 미션 칸
+  const W_ISLAND     = 4; // 무인도 (일부러 확률을 낮게 유지)
+  const W_START      = 2; // START
+  const W_EVENT      = 3; // 이벤트(물음표) 칸 — 이전 대비 확률 절반
+
+  const pool = [];
+  for(let r=1;r<=6;r++){
+    const target = (state.position + r) % TOTAL_CELLS;
+    const targetMission = MISSIONS[target];
+    let weight = 0;
+    if(target === 0){
+      weight = W_START;
+    } else if(target === ISLAND_INDEX){
+      weight = W_ISLAND;
+    } else if(targetMission.isEvent){
+      weight = W_EVENT;
+    } else {
+      const lvl = getLevel(target);
+      if(lvl >= MAX_LEVEL) continue; // 마스터된 칸은 이동 대상에서 제외
+      weight = (lvl === 0) ? W_UNVISITED : W_REVISIT;
+    }
+    for(let k=0;k<weight;k++) pool.push(r);
+  }
+  if(pool.length > 0) return pool;
+  return [1,2,3,4,5,6];
+}
+
+// 지금 말이 서 있는 칸이 '아직 완료 안 한 실제 미션'인지 확인한다.
+// (START/이벤트/무인도는 대상 아님, 이미 마스터(레벨3)됐어도 대상 아님, 이번 도착에서 이미 완료했어도 대상 아님)
+function getPendingMissionAtPosition(){
+  const idx = state.position;
+  if(idx === 0) return null;
+  const mission = MISSIONS[idx];
+  if(!mission || isEventCell(mission)) return null;
+  if(state.completionUsed) return null;
+  if(getLevel(idx) >= MAX_LEVEL) return null;
+  return { index: idx, mission };
+}
+
+// 주사위 버튼을 눌렀을 때: 아직 완료 안 한 미션이 있으면 먼저 확인 팝업으로 붙잡고,
+// 없으면 바로 주사위를 굴린다.
+function handleRollClick(){
+  if(isRolling) return;
+  const pending = getPendingMissionAtPosition();
+  if(pending){
+    openPendingMissionWarning(pending);
+    return;
+  }
+  onRoll();
+}
+
+function openPendingMissionWarning(pending){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--sunset-1)">⚠️ 잠깐만요!</p>
+          <h2 class="font-display text-xl font-bold mt-1">${pending.mission.emoji} ${escapeHtml(pending.mission.title)} 완료 안 하셨어요</h2>
+        </div>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">지금 주사위를 굴리면 말이 다른 칸으로 이동해서, 이 미션은 다시 도착할 때까지 완료할 수 없어요. 정말 이대로 넘어갈까요?</p>
+      <div class="flex gap-3 mt-6">
+        <button id="pending-go-complete" class="flex-1 track-btn py-3 rounded-xl font-display font-bold text-white text-sm">미션 완료하러 가기</button>
+        <button id="pending-skip" class="flex-1 py-3 rounded-xl font-display font-bold text-sm"
+          style="background:var(--bg-elev-2); color:var(--text);">그냥 진행할게요</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  backdrop.querySelector('#pending-go-complete').addEventListener('click', ()=>{
+    close();
+    openMission(pending.index);
+  });
+  backdrop.querySelector('#pending-skip').addEventListener('click', ()=>{
+    close();
+    onRoll();
+  });
+}
+
+// 다른 탭/기기에서 이미 오늘 주사위를 썼는지, 보너스를 이미 썼는지 클라우드에서 최신으로 확인한다.
+// (로컬 메모리만 보고 판단하면, 창 두 개를 새로고침 없이 각자 열어둔 채로 둘 다 굴려서
+// 하루 제한/보너스 개수를 실제보다 더 많이 쓸 수 있는 구멍이 생긴다 — 그걸 막기 위한 함수)
+async function syncRollAvailabilityFromCloud(){
+  if(!window.__fb || !state || !state.nickname || !state.pin) return;
+  try{
+    const ref = cloudDocRef(state.nickname, state.pin);
+    if(!ref) return;
+    const snap = await window.__fb.getDoc(ref);
+    if(!snap.exists()) return;
+    const cloudData = snap.data();
+    if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
+      const cloudCount = cloudData.dailyRolls.count || 0;
+      const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
+      if(cloudCount > localCount){
+        state.dailyRolls = { date: getTodayStr(), count: cloudCount };
+      }
+    }
+    if(typeof cloudData.bonusRolls === 'number'){
+      state.bonusRolls = cloudData.bonusRolls; // increment 전용이라 클라우드 값이 항상 정확함
+    }
+    saveState(state);
+  }catch(e){ console.warn('주사위 가능 횟수 확인 실패:', e); }
+}
+
+async function onRoll(){
+  if(isRolling) return;
+  // 테스트 모드이므로 시작일 제한(CAMPAIGN_START_DATE) 체크는 비활성화해뒀어요.
+
+  isRolling = true; // 아래 클라우드 확인하는 동안에도 중복 클릭 막기
+  setBackButtonLocked(true); // 주사위 굴리는 동안엔 뒤로가기로 못 나가게 막는다 (애니메이션 중간에 나가면 위치 저장이 안 될 수 있음)
+  if(!state.adminMode){
+    await syncRollAvailabilityFromCloud();
+  }
+
+  const hasBonus = (state.bonusRolls || 0) > 0;
+  if(!state.adminMode && getRollsLeft() <= 0 && !hasBonus){
+    isRolling = false;
+    setBackButtonLocked(false);
+    showToast('오늘 주사위를 모두 사용했어요! 내일 다시 도전해보세요');
+    return;
+  }
+  const validRolls = getValidRolls();
+  if(validRolls.length === 0){
+    isRolling = false;
+    setBackButtonLocked(false);
+    alert('지금 위치에서는 이동할 수 있는 칸이 없어요. 잠시 후 다시 시도해주세요!');
+    return;
+  }
+
+  const rollBtn = document.getElementById('roll-btn');
+  const die1 = document.getElementById('dice1');
+  rollBtn.disabled = true;
+  die1.classList.add('rolling');
+
+  const spinInterval = setInterval(()=>{
+    renderDicePips(1 + Math.floor(Math.random()*6), 'dice1');
+  }, 90);
+
+  setTimeout(()=>{
+    clearInterval(spinInterval);
+    die1.classList.remove('rolling');
+    const result = validRolls[Math.floor(Math.random()*validRolls.length)];
+    renderDicePips(result, 'dice1');
+    if(!state.adminMode){
+      if(getRollsLeft() > 0){
+        state.dailyRolls.count += 1;
+      } else if(state.bonusRolls > 0){
+        state.bonusRolls -= 1;
+        cloudIncrement({ bonusRolls: -1 }); // 클라우드에도 '빼기'로 안전하게 반영
+      }
+    }
+    saveState(state);
+    moveToken(result, ()=>{
+      isRolling = false;
+      setBackButtonLocked(false);
+      renderGame();
+    });
+  }, 1500);
+}
+
+// 주사위 굴리기/이동/도착 처리가 끝날 때까지 뒤로가기 버튼을 잠가서,
+// 애니메이션 도중 페이지를 나가버려서 위치 저장이 안 되는 사고를 막는다.
+function setBackButtonLocked(locked){
+  const btn = document.getElementById('marble-back-btn');
+  if(!btn) return;
+  btn.disabled = locked;
+  btn.style.opacity = locked ? '.4' : '1';
+  btn.style.cursor = locked ? 'not-allowed' : 'pointer';
+}
+
+function moveToken(steps, onDone){
+  animateSteps(state.position, steps, (finalIndex)=>{
+    setTimeout(()=> resolveLanding(finalIndex, 0, onDone), 550);
+  });
+}
+
+function animateSteps(fromIndex, delta, onDone){
+  let current = fromIndex;
+  let remaining = Math.abs(delta);
+  const dir = delta >= 0 ? 1 : -1;
+
+  function step(){
+    if(remaining <= 0){
+      if(onDone) onDone(current);
+      return;
+    }
+    current = (current + dir + TOTAL_CELLS) % TOTAL_CELLS;
+    remaining--;
+    // 정확히 도착(마지막 칸)이 아니라 '지나쳐 가는' 경우에도 START를 통과하면 보너스 지급
+    // (부루마불의 '월급' 규칙과 동일 — 밟든 지나치든 보상). 정확히 도착하는 경우는 resolveLanding에서 처리.
+    if(dir === 1 && current === 0 && remaining > 0){
+      state.bonusRolls = (state.bonusRolls || 0) + 1;
+      saveState(state);
+      cloudIncrement({ bonusRolls: 1 }); // 클라우드에도 '더하기'로 안전하게 반영
+      showToast('🎉 START 통과! 무료 주사위 찬스 +1');
+    }
+    positionToken(current, true);
+    setTimeout(step, 480);
+  }
+
+  if(delta === 0){ if(onDone) onDone(current); return; }
+  step();
+}
+
+function resolveLanding(index, depth, onFinalDone){
+  depth = depth || 0;
+  state.position = index;
+  state.completionUsed = false; // 새로 도착했으니 이번 칸에서 완료 기회를 다시 준다
+  saveState(state);
+  cloudSyncPositionNow(); // 위치는 디바운스 없이 바로 클라우드에 반영
+  renderCells();
+
+  const mission = MISSIONS[index];
+
+  if(index === 0){
+    applyStartBonus();
+    if(onFinalDone) onFinalDone();
+    return;
+  }
+
+  if(index === ISLAND_INDEX){
+    openIslandEscape(onFinalDone);
+    return;
+  }
+
+  if(mission.isEvent){
+    if(depth < 6){
+      const effect = pickRandomEventEffect();
+      runEventEffect(effect, index, depth, onFinalDone);
+      return;
+    }
+    showToast('⚠️ 이벤트가 계속 이어져서 여기서 멈출게요');
+  } else {
+    openMission(index);
+  }
+
+  if(onFinalDone) onFinalDone();
+}
+
+// START 도착 처리 (직접 도착이든, '출발지로 돌아가기' 이벤트 효과든 동일)
+function applyStartBonus(){
+  state.bonusRolls = (state.bonusRolls || 0) + 1;
+  saveState(state);
+  cloudIncrement({ bonusRolls: 1 }); // 클라우드에도 '더하기'로 안전하게 반영
+  showToast('🎉 START 도착! 무료 주사위 찬스 +1');
+}
+
+// 무인도 탈출 미니게임: 주사위 2개를 굴려 '더블(같은 숫자)'이 나오면 탈출.
+// 최대 3번까지 시도할 수 있고, 탈출에 성공하면 주사위를 한 번 더 던질 수 있는 보너스 찬스를 준다.
+// (직접 도착이든, '무인도 가기' 이벤트 효과든 동일하게 이 미니게임이 뜬다)
+function openIslandEscape(onFinalDone){
+  const MAX_ATTEMPTS = 3;
+  let attemptsLeft = MAX_ATTEMPTS;
+  let resolved = false;
+  let rolling = false;
+
+  const finish = ()=>{
+    if(resolved) return;
+    resolved = true;
+    backdrop.remove();
+    if(onFinalDone) onFinalDone();
+  };
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">🏝️ 무인도 표류</p>
+          <h2 class="font-display text-xl font-bold mt-1">탈출을 시도해보세요!</h2>
+        </div>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">
+        주사위 2개를 던져서 <b style="color:var(--text)">같은 숫자(더블)</b>가 나오면 탈출 성공!<br>
+        <b style="color:var(--text)">3번 안에</b> 성공하면 주사위를 <b style="color:var(--text)">한 번 더</b> 던질 기회를 드려요.
+      </p>
+      <div class="flex justify-center gap-3 mt-5">
+        <div id="escape-dice1" class="die"></div>
+        <div id="escape-dice2" class="die"></div>
+      </div>
+      <p id="escape-attempts" class="text-center text-xs mt-3" style="color:var(--text-dim)">남은 시도: ${attemptsLeft}번</p>
+      <button id="escape-roll-btn" class="w-full mt-5 track-btn py-3 rounded-xl font-display font-bold text-white text-sm">주사위 굴리기</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  renderDicePips(1, 'escape-dice1');
+  renderDicePips(1, 'escape-dice2');
+
+  const rollBtn = backdrop.querySelector('#escape-roll-btn');
+  const attemptsLabel = backdrop.querySelector('#escape-attempts');
+  const d1El = backdrop.querySelector('#escape-dice1');
+  const d2El = backdrop.querySelector('#escape-dice2');
+
+  rollBtn.addEventListener('click', ()=>{
+    if(rolling || resolved) return;
+    rolling = true;
+    rollBtn.disabled = true;
+    d1El.classList.add('rolling');
+    d2El.classList.add('rolling');
+
+    const spin = setInterval(()=>{
+      renderDicePips(1 + Math.floor(Math.random()*6), 'escape-dice1');
+      renderDicePips(1 + Math.floor(Math.random()*6), 'escape-dice2');
+    }, 90);
+
+    setTimeout(()=>{
+      clearInterval(spin);
+      d1El.classList.remove('rolling');
+      d2El.classList.remove('rolling');
+      const v1 = 1 + Math.floor(Math.random()*6);
+      const isLastAttempt = attemptsLeft === 1; // 시작값 3에서 여기가 마지막(3번째) 시도
+      const v2 = isLastAttempt ? v1 : (1 + Math.floor(Math.random()*6)); // 마지막 시도는 무조건 더블(탈출 보장)
+      renderDicePips(v1, 'escape-dice1');
+      renderDicePips(v2, 'escape-dice2');
+      attemptsLeft--;
+      rolling = false;
+
+      if(v1 === v2){
+        state.bonusRolls = (state.bonusRolls || 0) + 1;
+        saveState(state);
+        cloudIncrement({ bonusRolls: 1 }); // 클라우드에도 '더하기'로 안전하게 반영
+        showToast('🎉 더블! 무인도 탈출 성공 — 주사위 찬스 +1');
+        setTimeout(finish, 900);
+      } else if(attemptsLeft <= 0){
+        showToast('😢 탈출 실패... 다음 기회에 다시 도전해보세요');
+        setTimeout(finish, 900);
+      } else {
+        attemptsLabel.textContent = `남은 시도: ${attemptsLeft}번`;
+        rollBtn.disabled = false;
+      }
+    }, 900);
+  });
+
+  // 탈출 실패로 끝나기 전엔 바깥을 눌러도 그냥 안 닫히게(강제로 시도하게) 두고,
+  // 이미 끝난 뒤(finish 호출됨)에는 backdrop 자체가 사라지므로 문제 없다.
+}
+
+// 이벤트(물음표) 칸에 도착했을 때 발동할 효과를 가중치 기반으로 랜덤 선택한다.
+// 무인도로 보내는 효과는 확률을 낮게 유지한다.
+function pickRandomEventEffect(){
+  // 사용자가 직접 정한 확률(%) — 합계 100
+  const table = [
+    { key:'island',   weight:5 },  // 무인도
+    { key:'gift',     weight:5 },  // 원하는 칸 이동
+    { key:'start',    weight:10 }, // 출발지 이동
+    { key:'forward1', weight:20 }, // 앞으로 한 칸
+    { key:'forward2', weight:20 }, // 앞으로 두 칸
+    { key:'back1',    weight:20 }, // 뒤로 한 칸
+    { key:'back2',    weight:20 }, // 뒤로 두 칸
+  ];
+  const pool = [];
+  table.forEach(t => { for(let k=0;k<t.weight;k++) pool.push(t.key); });
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function runEventEffect(effect, index, depth, onFinalDone){
+  if(effect === 'start'){
+    openEventConfirm('❓ 이벤트 칸', '🏁 출발지로 돌아가기', '출발지(START)로 이동하겠습니다', ()=>{
+      positionToken(0, true);
+      setTimeout(()=> resolveLanding(0, depth+1, onFinalDone), 480);
+    });
+  } else if(effect === 'forward1'){
+    openEventConfirm('❓ 이벤트 칸', '🍀 소소한 행운', '앞으로 1칸 이동하겠습니다', ()=>{
+      animateSteps(index, 1, (finalIdx)=> {
+        setTimeout(()=> resolveLanding(finalIdx, depth+1, onFinalDone), 550);
+      });
+    });
+  } else if(effect === 'forward2'){
+    openEventConfirm('❓ 이벤트 칸', '📣 응원을 듬뿍 받았어요', '앞으로 2칸 이동하겠습니다', ()=>{
+      animateSteps(index, 2, (finalIdx)=> {
+        setTimeout(()=> resolveLanding(finalIdx, depth+1, onFinalDone), 550);
+      });
+    });
+  } else if(effect === 'back1'){
+    openEventConfirm('❓ 이벤트 칸', '⚠️ 어이쿠!', '뒤로 1칸 이동하겠습니다', ()=>{
+      animateSteps(index, -1, (finalIdx)=> {
+        setTimeout(()=> resolveLanding(finalIdx, depth+1, onFinalDone), 550);
+      });
+    });
+  } else if(effect === 'back2'){
+    openEventConfirm('❓ 이벤트 칸', '⚠️ 이런!', '뒤로 2칸 이동하겠습니다', ()=>{
+      animateSteps(index, -2, (finalIdx)=> {
+        setTimeout(()=> resolveLanding(finalIdx, depth+1, onFinalDone), 550);
+      });
+    });
+  } else if(effect === 'island'){
+    openEventConfirm('❓ 이벤트 칸', '🏝️ 무인도行', '무인도로 이동하겠습니다', ()=>{
+      positionToken(ISLAND_INDEX, true);
+      setTimeout(()=> resolveLanding(ISLAND_INDEX, depth+1, onFinalDone), 480);
+    });
+  } else { // gift
+    openGiftPicker(index, depth, onFinalDone);
+  }
+}
+
+
+
+/* =========================================================
+   미션 모달
+   ========================================================= */
+function openMission(index){
+  if(index === 0) return;
+  const mission = MISSIONS[index];
+  if(mission.isEvent) return; // 랜덤 이벤트 칸은 클릭 미리보기 자체가 없음
+  const isIsland = !!mission.isIsland;
+  const isEvent = isEventCell(mission);
+  const level = getLevel(index);
+  const mastered = level >= MAX_LEVEL;
+  const canComplete = !isEvent && (index === state.position) && !mastered && !state.completionUsed;
+
+  const eventLabel = isIsland ? '⚠️ 위험 칸' : null;
+
+  const LEVEL_COLOR = { 1:'--complete', 2:'--level2', 3:'--level3' };
+  const levelLabel = ['','1회 완료 · 초록','2회 완료 · 파랑','3회 완료 · 보라(마스터)'][level];
+  const levelColorVar = level > 0 ? `var(${LEVEL_COLOR[Math.min(level, MAX_LEVEL)]})` : null;
+  const levelDimVar = level > 0 ? `var(${LEVEL_COLOR[Math.min(level, MAX_LEVEL)]}-dim)` : null;
+
+  let footerHtml;
+  if(canComplete){
+    footerHtml = `
+      ${level > 0 ? `<p class="text-xs mt-4" style="color:var(--text-dim)">현재 ${levelLabel} 상태예요. 다시 완료하면 다음 단계로 올라가요.</p>` : ''}
+      <label class="flex items-center gap-2 mt-4 px-3 py-2.5 rounded-xl text-xs font-medium select-none" style="background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text); cursor:pointer;">
+        <input id="sns-confirm-checkbox" type="checkbox" class="w-4 h-4 flex-shrink-0" style="accent-color:var(--sunset-1);">
+        기본미션+특별미션 인증사진을 SNS에 올렸어요
+      </label>
+      <button id="complete-btn" class="w-full track-btn py-3 rounded-xl font-display font-bold text-white text-sm mt-3" disabled style="opacity:.4; cursor:not-allowed;">미션 완료</button>
+    `;
+  } else {
+    footerHtml = `
+      <div class="mt-6">
+        ${level > 0 ? `<div class="w-full py-3 rounded-xl text-center font-display font-bold text-sm mb-3" style="background:${mastered ? levelDimVar : 'var(--complete-dim)'}; color:${mastered ? levelColorVar : 'var(--complete)'}; border:1px solid ${mastered ? levelColorVar : 'var(--complete)'};">${mastered ? '🏅 마스터한 미션이에요' : '✅ ' + levelLabel}</div>` : ''}
+        <button id="modal-confirm" class="w-full py-3 rounded-xl font-display font-bold text-sm"
+          style="background:var(--bg-elev-2); color:var(--text);">확인</button>
+      </div>
+    `;
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">${eventLabel ? eventLabel : `MISSION ${MISSION_NUMBER[index]}`}${!canComplete && !isEvent && level===0 ? ' · 미리보기' : ''}</p>
+          <h2 class="font-display text-xl font-bold mt-1">${mission.emoji} ${escapeHtml(mission.title)}</h2>
+        </div>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">${escapeHtmlMultiline(mission.desc)}</p>
+      ${footerHtml}
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  const confirmBtn = backdrop.querySelector('#modal-confirm');
+  if(confirmBtn) confirmBtn.addEventListener('click', close);
+  const completeBtn = backdrop.querySelector('#complete-btn');
+  const snsCheckbox = backdrop.querySelector('#sns-confirm-checkbox');
+  if(snsCheckbox && completeBtn){
+    snsCheckbox.addEventListener('change', ()=>{
+      completeBtn.disabled = !snsCheckbox.checked;
+      completeBtn.style.opacity = snsCheckbox.checked ? '1' : '.4';
+      completeBtn.style.cursor = snsCheckbox.checked ? 'pointer' : 'not-allowed';
+    });
+  }
+  if(completeBtn){
+    completeBtn.addEventListener('click', ()=>{
+      if(snsCheckbox && !snsCheckbox.checked) return; // SNS 인증 체크 전에는 완료 불가
+      if(!state.completionUsed && getLevel(index) < MAX_LEVEL){
+        setLevel(index, getLevel(index) + 1);
+        const earnedPoints = getLevel(index) * 100; // 1회100점,2회200점,3회300점(마스터)
+        state.score = (state.score || 0) + earnedPoints;
+        state.completionUsed = true; // 이번 도착에서의 완료 기회는 다 썼음
+        cloudIncrement({ ['levels.' + missionIdAt(index)]: 1, score: earnedPoints }); // 클라우드에도 '더하기'로만 안전하게 반영
+        checkLineBonuses(); // 방금 완료로 어떤 변이 다 채워졌는지 확인해서 보너스 지급
+        saveState(state);
+        renderCells();
+        refreshProgress();
+      }
+      close();
+    });
+  }
+}
+
+// 보드 4변(위/오른/아래/왼쪽) 중 방금 새로 다 채워진 변이 있으면 100점 보너스를 지급한다.
+// 한 변당 딱 1번만 지급되고, 그 변의 미션 4개가 각각 1회 이상 완료되면 조건이 충족된다.
+function checkLineBonuses(){
+  LINE_GROUPS.forEach((group, gi)=>{
+    if(state.lineBonusAwarded[gi]) return; // 이미 받은 변은 다시 안 줌
+    const allDone = group.indices.every(idx => getLevel(idx) >= 1);
+    if(allDone){
+      state.lineBonusAwarded[gi] = true;
+      state.score = (state.score || 0) + LINE_BONUS_POINTS;
+      cloudIncrement({ score: LINE_BONUS_POINTS }); // 클라우드에도 '더하기'로만 안전하게 반영
+      showToast(`🎉 ${group.name} 라인 완성! 보너스 +${LINE_BONUS_POINTS}점`, 2600);
+    }
+  });
+}
+
+
+/* =========================================================
+   응원/물음표 칸: 이동하기 전에 확인 팝업을 띄운다
+   ========================================================= */
+function openEventConfirm(label, title, desc, onProceed){
+  let settled = false;
+  const proceed = ()=>{
+    if(settled) return;
+    settled = true;
+    backdrop.remove();
+    onProceed();
+  };
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">${label}</p>
+          <h2 class="font-display text-xl font-bold mt-1">${escapeHtml(title)}</h2>
+        </div>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">${escapeHtml(desc)}</p>
+      <button id="event-confirm-btn" class="w-full mt-6 track-btn py-3 rounded-xl font-display font-bold text-white text-sm">확인</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) proceed(); });
+  backdrop.querySelector('#event-confirm-btn').addEventListener('click', proceed);
+}
+
+/* =========================================================
+   선물 칸: 원하는 미션 칸으로 바로 이동
+   ========================================================= */
+function openGiftPicker(giftIndex, depth, onFinalDone){
+  let settled = false;
+  let selectedIdx = null;
+  const finish = ()=>{ if(!settled){ settled = true; if(onFinalDone) onFinalDone(); } };
+
+  // 보드 전체를 작게 그려서, 각 미션 칸의 완료 상태(색상)를 보고 고를 수 있게 한다.
+  let miniCellsHtml = '';
+  for(let i=0;i<TOTAL_CELLS;i++){
+    const { xPct, yPct } = getPointOnTrack(i, TOTAL_CELLS);
+    const m = MISSIONS[i];
+    const isStart = i===0;
+    const isIsland = !!m.isIsland;
+    const isRandomEvent = !!m.isEvent;
+    const lvl = getLevel(i);
+    let cls = 'gift-mini-cell';
+    if(isStart) cls += ' start';
+    else if(isIsland) cls += ' island';
+    else if(isRandomEvent) cls += ' event';
+    else if(lvl >= 1) cls += ` lvl${Math.min(lvl, MAX_LEVEL)}`;
+    const clickable = !isStart && !isIsland && !isRandomEvent;
+    if(i === state.position) cls += ' current';
+    const label = isStart ? '' : isIsland ? '' : isRandomEvent ? '?' : (m.emoji);
+    miniCellsHtml += `
+      <div class="${cls}" style="left:${xPct}%; top:${yPct}%;" ${clickable ? `data-idx="${i}"` : ''}>
+        <span>${label}</span>
+      </div>
+    `;
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">❓ 이벤트 칸</p>
+          <h2 class="font-display text-xl font-bold mt-1">🎁 원하는 칸으로 이동!</h2>
+        </div>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">지도에서 칸을 눌러 어떤 미션인지 확인한 다음, 이동할 칸을 정해주세요.</p>
+      <div class="gift-mini-board mt-4">${miniCellsHtml}</div>
+
+      <div id="gift-preview" class="mt-4 rounded-xl p-3" style="background:var(--bg-elev-2); border:1px dashed var(--line); min-height:52px;">
+        <p class="text-xs" style="color:var(--text-dim)">👆 지도에서 칸을 눌러 미션을 확인해보세요</p>
+      </div>
+
+      <button id="gift-move-btn" class="w-full mt-4 track-btn py-3 rounded-xl font-display font-bold text-white text-sm" disabled style="opacity:.4;">
+        이 칸으로 이동하기
+      </button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const previewEl = backdrop.querySelector('#gift-preview');
+  const moveBtn = backdrop.querySelector('#gift-move-btn');
+
+  const close = ()=>{ backdrop.remove(); finish(); };
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+
+  backdrop.querySelectorAll('.gift-mini-cell[data-idx]').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      // 이전 선택 표시 지우고 새로 선택한 칸 표시
+      backdrop.querySelectorAll('.gift-mini-cell.selected').forEach(el=> el.classList.remove('selected'));
+      cell.classList.add('selected');
+
+      const idx = parseInt(cell.dataset.idx, 10);
+      selectedIdx = idx;
+      const m = MISSIONS[idx];
+      const lvl = getLevel(idx);
+      const num = MISSION_NUMBER[idx];
+      const statusText = lvl >= MAX_LEVEL ? '🏅 마스터 완료' : lvl > 0 ? `✅ ${lvl}회 완료` : '아직 안 한 미션';
+
+      previewEl.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span style="font-size:26px; flex-shrink:0;">${m.emoji}</span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold truncate" style="color:var(--text)">${num}. ${escapeHtml(m.title)}</p>
+            <p class="text-xs mt-0.5" style="color:var(--text-dim)">${statusText}</p>
+          </div>
+        </div>
+        <p class="text-xs mt-2 leading-relaxed" style="color:var(--text-dim)">${escapeHtml(m.desc)}</p>
+      `;
+      moveBtn.disabled = false;
+      moveBtn.style.opacity = '1';
+    });
+  });
+
+  moveBtn.addEventListener('click', ()=>{
+    if(selectedIdx === null) return;
+    settled = true;
+    backdrop.remove();
+    // 순간이동이 아니라, 말이 시계방향으로 걸어서 이동한다 (그 과정에 START를 지나치면 보너스도 그대로 적용됨)
+    const forwardSteps = (selectedIdx - giftIndex + TOTAL_CELLS) % TOTAL_CELLS;
+    animateSteps(giftIndex, forwardSteps, (finalIdx)=> {
+      setTimeout(()=> resolveLanding(finalIdx, depth+1, onFinalDone), 550);
+    });
+  });
+}
+
+/* =========================================================
+   로그아웃 (기기에 저장된 로컬 기록을 지우고 온보딩 화면으로 돌아간다.
+   클라우드에 저장된 기록은 그대로 남아있어서, 같은 닉네임+개인코드로 다시 불러올 수 있다)
+   ========================================================= */
+function confirmReset(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <h2 class="font-display text-lg font-bold">정말 로그아웃 하시겠습니까?</h2>
+      <p class="text-sm mt-2" style="color:var(--text-dim)">이 기기에 저장된 닉네임, 목표, 진행 기록이 모두 사라져요. 닉네임과 개인 코드를 알고 있다면 다시 로그인해서 이어서 진행할 수 있어요.</p>
+      <div class="flex gap-3 mt-6">
+        <button id="cancel-reset" class="flex-1 py-3 rounded-xl text-sm font-semibold" style="background:var(--bg-elev-2); color:var(--text);">취소</button>
+        <button id="confirm-reset" class="flex-1 py-3 rounded-xl text-sm font-bold text-white" style="background:var(--sunset-1);">로그아웃</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) backdrop.remove(); });
+  backdrop.querySelector('#cancel-reset').addEventListener('click', ()=> backdrop.remove());
+  backdrop.querySelector('#confirm-reset').addEventListener('click', ()=>{
+    localStorage.removeItem(STORAGE_KEY);
+    state = null;
+    backdrop.remove();
+    render();
+  });
+}
+
+/* =========================================================
+   유틸
+   ========================================================= */
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// 텍스트 안의 실제 줄바꿈(Enter, \n)을 안전하게 <br>로 바꿔서 보여준다.
+// desc 문구에 <br>을 직접 타이핑할 필요 없이, 그냥 코드에서 Enter를 눌러 줄을 나누면 된다.
+function escapeHtmlMultiline(str){
+  return escapeHtml(str).replace(/\n/g, '<br>');
+}
+
+function showToast(msg, duration=2200){
+  const anchor = document.getElementById('roll-btn') || document.getElementById('dice1');
+  let top = 24, left = window.innerWidth/2;
+  if(anchor){
+    const rect = anchor.getBoundingClientRect();
+    top = rect.bottom + 12;
+    left = rect.left + rect.width/2;
+  }
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.top = top + 'px';
+  el.style.left = left + 'px';
+  el.style.transform = 'translateX(-50%)';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>{
+    el.style.transition = 'opacity .3s ease, transform .3s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, -10px)';
+    setTimeout(()=> el.remove(), 300);
+  }, duration);
+}
+
+// 앱을 켤 때(새로고침 포함) 클라우드에 있는 점수/미션레벨이 로컬보다 높으면 로컬을 그 값으로 맞춰준다.
+// (여러 탭을 써서 로컬 화면이 순간적으로 예전 값처럼 보이는 경우를 자동으로 바로잡는 안전장치)
+// 절대 값을 "낮추지"는 않고, 더 큰 값이 있을 때만 끌어올린다.
+async function reconcileWithCloud(){
+  if(!window.__fb || !state || !state.nickname || !state.pin) return;
+  try{
+    const ref = cloudDocRef(state.nickname, state.pin);
+    if(!ref) return;
+    const snap = await window.__fb.getDoc(ref);
+    if(!snap.exists()) return;
+    const cloudData = snap.data();
+    let changed = false;
+
+    let progressAheadOnCloud = false; // 클라우드가 점수/미션기록 면에서 이 기기보다 실제로 앞서있는지
+
+    if(typeof cloudData.score === 'number' && cloudData.score > (state.score || 0)){
+      state.score = cloudData.score;
+      changed = true;
+      progressAheadOnCloud = true;
+    }
+
+    const cloudLevels = (cloudData.levels && typeof cloudData.levels === 'object') ? cloudData.levels : {};
+    Object.keys(cloudLevels).forEach(missionId=>{
+      const cloudVal = cloudLevels[missionId] || 0;
+      const localVal = (state.levels && state.levels[missionId]) || 0;
+      if(cloudVal > localVal){
+        if(!state.levels) state.levels = {};
+        state.levels[missionId] = cloudVal;
+        changed = true;
+        progressAheadOnCloud = true;
+      }
+    });
+
+    // 말의 위치(position)는 '클라우드가 점수/기록 면에서 실제로 더 앞서있을 때만' 따라간다.
+    // (단순히 "클라우드 값이 다르면 무조건" 바꾸면, 이 기기에서 방금 주사위를 굴렸는데
+    // 아직 클라우드에 반영이 안 된 시점에 새로고침했을 때 오히려 방금 굴린 위치가
+    // 예전(출발지) 위치로 잘못 되돌아가는 사고가 난다 — 그걸 막기 위한 조건이다.
+    // 진짜로 다른 기기에서 더 진행된 경우엔 점수/기록이 이미 앞서있을 것이므로 안전하다.)
+    if(progressAheadOnCloud && typeof cloudData.position === 'number' && cloudData.position !== state.position){
+      state.position = cloudData.position;
+      changed = true;
+    }
+
+    // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 "OR 병합"한다.
+    // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
+    // (체크는 기본적으로 한 방향으로만 진행되는 동작이라, 둘 중 하나라도 체크했으면
+    // 안 지워지게 유지하는 게 안전하다 — 다른 기기에서 체크한 걸 이 기기가 다시 저장할 때
+    // 실수로 덮어써서 지워버리는 사고를 막아준다)
+    ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
+      const cloudChecks = (cloudData[key] && typeof cloudData[key] === 'object') ? cloudData[key] : {};
+      if(!state[key]) state[key] = {};
+      Object.keys(cloudChecks).forEach(dayIdx=>{
+        if(cloudChecks[dayIdx] && !state[key][dayIdx]){
+          state[key][dayIdx] = true;
+          changed = true;
+        }
+      });
+    });
+
+    // 오늘 주사위를 이미 몇 번 썼는지는, 다른 기기가 이미 더 많이 썼다면 그 값을 따라간다.
+    // (이걸 안 맞추면 한쪽 기기가 "하루 1회 제한"을 모르고 또 굴릴 수 있음)
+    if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
+      const cloudCount = cloudData.dailyRolls.count || 0;
+      const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
+      if(cloudCount > localCount){
+        state.dailyRolls = { date: getTodayStr(), count: cloudCount };
+        changed = true;
+      }
+    }
+
+    // 보너스 찬스는 이제 클라우드에서 오직 더하기/빼기(increment)로만 바뀌기 때문에,
+    // 클라우드 값이 항상 정확하다. 그래서 '더 큰 값'이 아니라 클라우드 값을 그대로 따라간다.
+    if(typeof cloudData.bonusRolls === 'number' && cloudData.bonusRolls !== (state.bonusRolls || 0)){
+      state.bonusRolls = cloudData.bonusRolls;
+      changed = true;
+    }
+    // 무인도 페널티 이월은 더 큰 값을 따라간다(안전한 쪽으로).
+    if(typeof cloudData.pendingPenalty === 'number' && cloudData.pendingPenalty > (state.pendingPenalty || 0)){
+      state.pendingPenalty = cloudData.pendingPenalty;
+      changed = true;
+    }
+
+    if(changed){
+      saveState(state);
+      if(currentView === 'hub' || currentView === 'marble') render();
+    }
+    return changed;
+  }catch(e){
+    console.warn('cloud 보정 확인 실패:', e);
+    return null; // 확인 자체가 실패한 경우(네트워크 오류 등)
+  }
+}
+
+// '새로고침' 버튼을 눌렀을 때: 화면을 통째로 다시 불러오지 않고,
+// 클라우드 보정만 다시 실행해서 부드럽게 최신 상태로 맞춘다.
+async function handleManualRefresh(){
+  const btn = document.getElementById('marble-refresh-btn');
+  if(!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.style.opacity = '.5';
+  const ready = await waitForFirebaseReady(3000);
+  if(!ready){
+    showToast('⚠️ 네트워크 연결을 확인해주세요');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    return;
+  }
+  const result = await reconcileWithCloud();
+  if(result === true){
+    showToast('✅ 최신 정보로 업데이트했어요');
+  } else if(result === false){
+    showToast('이미 최신 상태예요');
+  } else {
+    showToast('⚠️ 확인 중 문제가 생겼어요, 잠시 후 다시 시도해주세요');
+  }
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+// Firebase는 <script type="module">로 비동기 로드되기 때문에, 페이지가 막 열린 시점엔
+// 아직 window.__fb가 준비 안 됐을 수 있다. 이 함수 없이 reconcileWithCloud()를 바로 부르면
+// "아직 준비 안 됐네" 하고 조용히 포기해버려서, 새로고침해도 클라우드 값을 영영 확인 못 하는 문제가 생긴다.
+// 그래서 최대 5초 동안 0.1초 간격으로 준비될 때까지 기다렸다가 실행한다.
+function waitForFirebaseReady(maxWaitMs){
+  return new Promise((resolve)=>{
+    const start = Date.now();
+    (function poll(){
+      if(window.__fb){ resolve(true); return; }
+      if(Date.now() - start > maxWaitMs){ resolve(false); return; }
+      setTimeout(poll, 100);
+    })();
+  });
+}
+
+render();
+waitForFirebaseReady(5000).then((ready)=>{
+  if(ready) reconcileWithCloud();
+  else console.warn('Firebase가 5초 안에 준비되지 않아 클라우드 보정을 건너뜀 (로컬 데이터는 정상 사용 가능)');
+});
+</script>
+</body>
+</html>
