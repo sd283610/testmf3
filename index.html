@@ -950,6 +950,64 @@ function mapAuthError(e){
    ========================================================= */
 let authMode = 'login'; // 'login' | 'signup'
 
+/* =========================================================
+   비밀번호 찾기 (이메일 입력 → 재설정 메일 발송)
+   ========================================================= */
+function openPasswordResetModal(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <h2 class="font-display text-lg font-bold">🔑 비밀번호 찾기</h2>
+      <p class="text-sm mt-2" style="color:var(--text-dim)">가입할 때 쓰신 이메일을 입력하시면, 비밀번호를 재설정할 수 있는 링크를 보내드려요.</p>
+      <label class="text-xs font-semibold tracking-wide uppercase mt-4 block" style="color:var(--text-dim)">이메일</label>
+      <input id="reset-email-input" type="email" placeholder="you@example.com" autocomplete="email"
+        class="w-full mt-2 px-4 py-3 rounded-xl outline-none text-base"
+        style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+      <p id="reset-error" class="text-xs mt-2" style="color:var(--sunset-1); display:none;"></p>
+      <div class="flex gap-3 mt-6">
+        <button id="reset-cancel-btn" class="flex-1 py-3 rounded-xl text-sm font-semibold" style="background:var(--bg-elev-2); color:var(--text);">취소</button>
+        <button id="reset-send-btn" class="flex-1 py-3 rounded-xl text-sm font-bold text-white" style="background:var(--sunset-1);">재설정 메일 보내기</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#reset-cancel-btn').addEventListener('click', close);
+
+  const emailInput = backdrop.querySelector('#reset-email-input');
+  const errorMsg = backdrop.querySelector('#reset-error');
+  const sendBtn = backdrop.querySelector('#reset-send-btn');
+
+  const submit = async ()=>{
+    const emailVal = emailInput.value.trim();
+    errorMsg.style.display = 'none';
+    if(!emailVal){ emailInput.focus(); emailInput.style.borderColor = 'var(--sunset-1)'; return; }
+    if(!window.__fb){
+      errorMsg.textContent = '네트워크 연결을 확인하고 다시 시도해주세요.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    sendBtn.disabled = true;
+    const originalText = sendBtn.textContent;
+    sendBtn.textContent = '보내는 중...';
+    try{
+      await window.__fb.sendPasswordResetEmail(window.__fb.auth, emailVal);
+      showToast('📩 비밀번호 재설정 메일을 보냈어요');
+      close();
+    }catch(e){
+      errorMsg.textContent = mapAuthError(e);
+      errorMsg.style.display = 'block';
+      sendBtn.disabled = false;
+      sendBtn.textContent = originalText;
+    }
+  };
+  sendBtn.addEventListener('click', submit);
+  emailInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  emailInput.focus();
+}
+
 function renderAuthScreen(){
   app.innerHTML = `
     <div class="fade-in flex flex-col items-center justify-center" style="min-height:80vh;">
@@ -982,7 +1040,7 @@ function renderAuthScreen(){
 
         ${authMode==='login' ? `
         <button id="forgot-pw-btn" type="button" class="w-full mt-3 text-xs text-center underline" style="color:var(--text-dim);">
-          비밀번호를 잊으셨나요?
+          비밀번호 찾기
         </button>` : ''}
 
         <a href="https://open.kakao.com/o/ssVl6nGi" target="_blank" rel="noopener noreferrer"
@@ -1032,39 +1090,10 @@ function renderAuthScreen(){
 
   const forgotBtn = document.getElementById('forgot-pw-btn');
   if(forgotBtn){
-    forgotBtn.addEventListener('click', async ()=>{
-      const emailVal = emailInput.value.trim();
-      if(!emailVal){ emailInput.focus(); showError('비밀번호를 재설정할 이메일을 먼저 입력해주세요.'); return; }
-      if(!window.__fb) return;
-      try{
-        await window.__fb.sendPasswordResetEmail(window.__fb.auth, emailVal);
-        showToast('📩 비밀번호 재설정 메일을 보냈어요');
-      }catch(e){ showError(mapAuthError(e)); }
-    });
+    forgotBtn.addEventListener('click', openPasswordResetModal);
   }
 
   emailInput.focus();
-}
-
-/* =========================================================
-   개인정보 수집·이용 안내 (닉네임 설정 화면의 '자세히 보기'에서 호출)
-   ========================================================= */
-const PRIVACY_NOTICE = {
-  title: '🔒 개인정보 수집·이용 안내',
-  paragraphs: [
-    '마라닉프렌즈 9기 러닝마블 운영을 위해 아래와 같이 개인정보를 수집·이용합니다.',
-  ],
-  bullets: [
-    '수집 항목: 이메일 주소, 닉네임, 러닝마블·훈련 진행 기록(위치, 완료 미션, 점수 등)',
-    '수집 목적: 참가자 식별 및 로그인, 러닝마블 서비스 제공, 순위 집계 및 우수 참가자 선정',
-    '보유 기간: 세션 종료 후 별도 안내 시까지 보관하며, 이후 파기하거나 계정 삭제 요청 시 즉시 파기해요',
-    '위 동의는 서비스 이용을 위해 필수이며, 동의하지 않으실 경우 회원가입이 제한돼요',
-    '수집한 정보는 마라닉프렌즈 러닝마블 운영 목적 외에는 사용하지 않고, 제3자에게 제공하지 않아요',
-    '삭제·정정을 원하시면 카카오 오픈채팅으로 언제든 문의해주세요',
-  ],
-};
-function openPrivacyNoticeModal(){
-  openGuideModal(PRIVACY_NOTICE);
 }
 
 /* =========================================================
@@ -1086,7 +1115,7 @@ function renderNicknameSetup(){
           <input id="privacy-consent-checkbox" type="checkbox" class="mt-0.5" style="accent-color:var(--sunset-1); width:16px; height:16px; flex-shrink:0;">
           <span>
             <span style="color:var(--sunset-1); font-weight:600;">[필수]</span> 개인정보 수집·이용에 동의합니다
-            (<button id="privacy-notice-btn" type="button" class="underline" style="color:var(--text);">자세히 보기</button>)
+            (<a href="https://sd283610.github.io/testmf3/privacy.html" target="_blank" rel="noopener noreferrer" class="underline" style="color:var(--text);">자세히 보기</a>)
           </span>
         </label>
 
@@ -1101,8 +1130,6 @@ function renderNicknameSetup(){
   const errorMsg = document.getElementById('nickname-setup-error');
   const btn = document.getElementById('nickname-setup-btn');
   const consentCheckbox = document.getElementById('privacy-consent-checkbox');
-
-  document.getElementById('privacy-notice-btn').addEventListener('click', openPrivacyNoticeModal);
 
   const submit = async ()=>{
     const nickVal = input.value.trim();
