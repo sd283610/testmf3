@@ -645,6 +645,9 @@ function normalizeState(parsed){
     if(parsed && typeof parsed.arrivalId !== 'string'){
       parsed.arrivalId = null;
     }
+    if(parsed && !Array.isArray(parsed.completionLog)){
+      parsed.completionLog = [];
+    }
     if(parsed && !Array.isArray(parsed.lineBonusAwarded)){
       parsed.lineBonusAwarded = LINE_GROUPS.map(()=> false);
     }
@@ -699,6 +702,7 @@ function freshState(nickname, goal){
     pendingPenalty: 0, // 무인도 페널티를 오늘 다 못 뺐을 때 내일로 넘기는 빚
     completionUsed: false, // 이번 도착에서 '미션 완료'를 이미 썼는지 (연타 방지 + 다른 탭 반영용)
     arrivalId: null, // 이번 도착을 식별하는 고유값 — 서버 트랜잭션으로 '이 도착은 이미 완료 처리됐는지' 판단하는 기준
+    completionLog: [], // 미션 완료 이력 — {date, title, points} 순서대로 쌓임 ('나의 러닝마블 내역'에서 시간순으로 보여줌)
     training10k: {}, // 10K 훈련 프로그램 체크리스트 (day index -> boolean)
     trainingHalf: {}, // 하프 마라톤 훈련 프로그램 체크리스트
     trainingFull: {}, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
@@ -1032,8 +1036,15 @@ function renderAuthScreen(){
 
         <label class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">비밀번호</label>
         <input id="password-input" type="password" placeholder="6자 이상" autocomplete="${authMode==='signup' ? 'new-password' : 'current-password'}"
+          class="w-full mt-2 mb-4 px-4 py-3 rounded-xl outline-none text-base"
+          style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+
+        ${authMode==='signup' ? `
+        <label class="text-xs font-semibold tracking-wide uppercase" style="color:var(--text-dim)">비밀번호 확인</label>
+        <input id="password-confirm-input" type="password" placeholder="비밀번호를 한 번 더 입력해주세요" autocomplete="new-password"
           class="w-full mt-2 px-4 py-3 rounded-xl outline-none text-base"
           style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
+        ` : ''}
 
         <p id="auth-error" class="text-xs mt-2" style="color:var(--sunset-1); display:none;"></p>
 
@@ -1056,6 +1067,7 @@ function renderAuthScreen(){
 
   const emailInput = document.getElementById('email-input');
   const pwInput = document.getElementById('password-input');
+  const pwConfirmInput = document.getElementById('password-confirm-input'); // 회원가입 모드에서만 존재 (로그인 모드면 null)
   const errorMsg = document.getElementById('auth-error');
   const submitBtn = document.getElementById('auth-submit-btn');
 
@@ -1070,6 +1082,14 @@ function renderAuthScreen(){
     errorMsg.style.display = 'none';
     if(!emailVal){ emailInput.focus(); emailInput.style.borderColor = 'var(--sunset-1)'; return; }
     if(!pwVal || pwVal.length < 6){ pwInput.focus(); pwInput.style.borderColor = 'var(--sunset-1)'; showError('비밀번호는 6자 이상으로 입력해주세요.'); return; }
+    if(authMode === 'signup' && pwConfirmInput){
+      if(pwConfirmInput.value !== pwVal){
+        pwConfirmInput.focus();
+        pwConfirmInput.style.borderColor = 'var(--sunset-1)';
+        showError('비밀번호가 일치하지 않아요. 다시 확인해주세요.');
+        return;
+      }
+    }
     if(!window.__fb){ showError('네트워크 연결을 확인하고 다시 시도해주세요.'); return; }
 
     submitBtn.disabled = true;
@@ -1089,7 +1109,10 @@ function renderAuthScreen(){
     }
   };
   submitBtn.addEventListener('click', submit);
-  pwInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  pwInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ if(pwConfirmInput) pwConfirmInput.focus(); else submit(); } });
+  if(pwConfirmInput){
+    pwConfirmInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  }
 
   const forgotBtn = document.getElementById('forgot-pw-btn');
   if(forgotBtn){
@@ -1478,22 +1501,21 @@ function openMarbleGuide(){
 
 // '나의 러닝마블 내역' — 주사위(오늘 사용 횟수/보너스), 미션별 완료 횟수, 총점수를 한눈에 모아 보여준다.
 function openMarbleHistoryModal(){
-  const rollsLeft = getRollsLeft();
-  const bonusRolls = state.bonusRolls || 0;
-  const todayUsed = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
+  const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0);
 
-  const missionRows = MISSION_INDICES.map(i=>{
-    const m = MISSIONS[i];
-    const lvl = getLevel(i);
-    if(lvl <= 0) return '';
+  // 완료 이력을 최신순(최근에 완료한 게 위)으로 보여준다. 날짜는 'M/D' 형태로 짧게 표기.
+  const log = Array.isArray(state.completionLog) ? state.completionLog : [];
+  const logRowsHtml = [...log].reverse().map(entry=>{
+    const dateParts = (entry.date || '').split('-'); // 'YYYY-MM-DD' -> ['YYYY','MM','DD']
+    const shortDate = dateParts.length === 3 ? `${parseInt(dateParts[1],10)}/${parseInt(dateParts[2],10)}` : (entry.date || '');
     return `
       <div class="flex items-center justify-between text-sm py-2" style="border-bottom:1px solid var(--line);">
-        <span style="color:var(--text)">${m.emoji} ${escapeHtml(m.title)}</span>
-        <span class="font-display font-bold" style="color:var(--level4)">${lvl}회</span>
+        <span style="color:var(--text-dim); flex-shrink:0; width:44px;">${escapeHtml(shortDate)}</span>
+        <span style="color:var(--text); flex:1; padding:0 8px;">${escapeHtml(entry.title || '')}</span>
+        <span class="font-display font-bold" style="color:var(--level4); flex-shrink:0;">+${entry.points || 0}</span>
       </div>
     `;
   }).join('');
-  const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0);
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -1505,7 +1527,7 @@ function openMarbleHistoryModal(){
           style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
       </div>
 
-      <div class="mt-4 rounded-2xl p-4 grid grid-cols-3 gap-2 text-center" style="background:var(--bg-elev-2);">
+      <div class="mt-4 rounded-2xl p-4 grid grid-cols-2 gap-2 text-center" style="background:var(--bg-elev-2);">
         <div>
           <p class="text-[10px]" style="color:var(--text-dim)">총점수</p>
           <p class="font-display font-bold text-lg" style="color:var(--level4)">${state.score || 0}점</p>
@@ -1514,17 +1536,11 @@ function openMarbleHistoryModal(){
           <p class="text-[10px]" style="color:var(--text-dim)">총 완료</p>
           <p class="font-display font-bold text-lg sunset-text">${totalCompletions}회</p>
         </div>
-        <div>
-          <p class="text-[10px]" style="color:var(--text-dim)">보너스 주사위</p>
-          <p class="font-display font-bold text-lg" style="color:var(--text)">${bonusRolls}개</p>
-        </div>
       </div>
 
-      <p class="text-xs mt-4" style="color:var(--text-dim)">오늘 주사위: ${todayUsed}번 사용 · ${rollsLeft > 0 ? rollsLeft + '번 더 굴릴 수 있어요' : '오늘 기본 횟수는 다 썼어요'}</p>
-
       <div class="mt-4">
-        <p class="text-xs font-bold tracking-wide uppercase mb-1" style="color:var(--text-dim)">미션별 완료 내역</p>
-        ${missionRows ? `<div>${missionRows}</div>` : `<p class="text-sm mt-2" style="color:var(--text-dim)">아직 완료한 미션이 없어요. 주사위를 굴려서 시작해보세요!</p>`}
+        <p class="text-xs font-bold tracking-wide uppercase mb-1" style="color:var(--text-dim)">미션 완료 내역</p>
+        ${logRowsHtml ? `<div>${logRowsHtml}</div>` : `<p class="text-sm mt-2" style="color:var(--text-dim)">아직 완료한 미션이 없어요. 주사위를 굴려서 시작해보세요!</p>`}
       </div>
 
       <button id="modal-confirm" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">확인</button>
@@ -2316,13 +2332,18 @@ function openMission(index){
           const newLevel = currentLevel + 1;
           const earnedPoints = newLevel * 100; // 1회100점,2회200점,3회300점(마스터)
           const newScore = (data.score || 0) + earnedPoints;
+          // '나의 러닝마블 내역'에서 시간순으로 보여주기 위한 완료 이력 한 줄 추가.
+          // (문서 하나에 계속 쌓이는 배열이라, 혹시 모를 과도한 증가를 대비해 최근 300개까지만 유지한다)
+          const prevLog = Array.isArray(data.completionLog) ? data.completionLog : [];
+          const newLog = [...prevLog, { date: getTodayStr(), title: mission.title, points: earnedPoints }].slice(-300);
           tx.update(ref, {
             ['levels.' + missionId]: newLevel,
             score: newScore,
             completedArrivalId: arrivalId,
+            completionLog: newLog,
             updatedAt: window.__fb.serverTimestamp(),
           });
-          return { already:false, newLevel, earnedPoints, newScore };
+          return { already:false, newLevel, earnedPoints, newScore, newLog };
         });
 
         if(result.already){
@@ -2331,6 +2352,7 @@ function openMission(index){
         } else {
           setLevel(index, result.newLevel);
           state.score = result.newScore;
+          state.completionLog = result.newLog;
           state.completionUsed = true;
           checkLineBonuses(); // 방금 완료로 어떤 변이 다 채워졌는지 확인해서 보너스 지급
         }
@@ -2599,6 +2621,12 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
       progressAheadOnCloud = true;
     }
   });
+
+  // 완료 이력('나의 러닝마블 내역')도, 클라우드 쪽 기록이 더 길면(=다른 탭에서 완료가 더 있었으면) 그걸로 맞춘다.
+  if(Array.isArray(cloudData.completionLog) && cloudData.completionLog.length > (state.completionLog || []).length){
+    state.completionLog = cloudData.completionLog;
+    changed = true;
+  }
 
   // 말의 위치(position)는 '클라우드가 점수/기록 면에서 실제로 더 앞서있을 때만' 따라간다.
   // (단순히 "클라우드 값이 다르면 무조건" 바꾸면, 이 기기에서 방금 주사위를 굴렸는데
