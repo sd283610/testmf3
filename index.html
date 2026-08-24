@@ -14,7 +14,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp,
-    collection, query, where, getDocs, limit, onSnapshot
+    collection, query, where, getDocs, limit, onSnapshot, runTransaction
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
   import {
     getAuth, onAuthStateChanged,
@@ -36,7 +36,7 @@
     const db = getFirestore(fbApp);
     const auth = getAuth(fbApp);
     window.__fb = {
-      db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit, onSnapshot,
+      db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit, onSnapshot, runTransaction,
       auth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
       sendPasswordResetEmail, signOut
     };
@@ -642,6 +642,9 @@ function normalizeState(parsed){
     if(parsed && typeof parsed.completionUsed !== 'boolean'){
       parsed.completionUsed = false;
     }
+    if(parsed && typeof parsed.arrivalId !== 'string'){
+      parsed.arrivalId = null;
+    }
     if(parsed && !Array.isArray(parsed.lineBonusAwarded)){
       parsed.lineBonusAwarded = LINE_GROUPS.map(()=> false);
     }
@@ -694,7 +697,8 @@ function freshState(nickname, goal){
     adminMode: false,
     bonusRolls: 0,
     pendingPenalty: 0, // 무인도 페널티를 오늘 다 못 뺐을 때 내일로 넘기는 빚
-    completionUsed: false, // 이번 도착에서 '미션 완료'를 이미 썼는지 (연타 방지)
+    completionUsed: false, // 이번 도착에서 '미션 완료'를 이미 썼는지 (연타 방지 + 다른 탭 반영용)
+    arrivalId: null, // 이번 도착을 식별하는 고유값 — 서버 트랜잭션으로 '이 도착은 이미 완료 처리됐는지' 판단하는 기준
     training10k: {}, // 10K 훈련 프로그램 체크리스트 (day index -> boolean)
     trainingHalf: {}, // 하프 마라톤 훈련 프로그램 체크리스트
     trainingFull: {}, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
@@ -774,7 +778,14 @@ async function cloudSyncPositionNow(){
   try{
     const ref = cloudDocRef();
     if(!ref) return;
-    await window.__fb.setDoc(ref, { position: state.position, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+    // arrivalId/completionUsed도 위치와 함께 즉시 반영해야, 다른 탭이 "이번 도착은 아직 완료 전"임을
+    // 곧바로 알 수 있다 (미션 완료 자체는 별도 트랜잭션이 최종 방어선이라 여기선 최신 상태 공유가 목적).
+    await window.__fb.setDoc(ref, {
+      position: state.position,
+      arrivalId: state.arrivalId,
+      completionUsed: state.completionUsed,
+      updatedAt: window.__fb.serverTimestamp(),
+    }, { merge:true });
   }catch(e){ console.warn('cloud 위치 저장 실패:', e); }
 }
 
@@ -1768,6 +1779,16 @@ function refreshProgress(){
    주사위 & 이동
    ========================================================= */
 let isRolling = false;
+let pendingCloudRender = false; // isRolling(애니메이션/모달 진행 중)인 동안 들어온 실시간 갱신을, 끝나는 즉시 반영하기 위한 플래그
+// 주사위 굴리기 흐름(애니메이션, 무인도 탈출, 이벤트 효과 모달 등)이 완전히 끝났을 때 반드시 이 함수를 통해서 isRolling을 끈다.
+// (직접 isRolling = false를 여러 곳에 흩어놓으면, 그 사이에 밀린 실시간 갱신을 반영할 타이밍을 놓치기 쉽다)
+function markRollingDone(){
+  isRolling = false;
+  if(pendingCloudRender){
+    pendingCloudRender = false;
+    if(currentView === 'hub' || currentView === 'marble') render();
+  }
+}
 
 function getValidRolls(){
   // 평소 이동은 주사위 1개(1~6)만 사용한다. (무인도 탈출 미니게임에서만 별도로 2개를 굴림)
@@ -1896,14 +1917,14 @@ async function onRoll(){
 
   const hasBonus = (state.bonusRolls || 0) > 0;
   if(!state.adminMode && getRollsLeft() <= 0 && !hasBonus){
-    isRolling = false;
+    markRollingDone();
     setBackButtonLocked(false);
     showToast('오늘 주사위를 모두 사용했어요! 내일 다시 도전해보세요');
     return;
   }
   const validRolls = getValidRolls();
   if(validRolls.length === 0){
-    isRolling = false;
+    markRollingDone();
     setBackButtonLocked(false);
     alert('지금 위치에서는 이동할 수 있는 칸이 없어요. 잠시 후 다시 시도해주세요!');
     return;
@@ -1933,7 +1954,7 @@ async function onRoll(){
     }
     saveState(state);
     moveToken(result, ()=>{
-      isRolling = false;
+      markRollingDone();
       setBackButtonLocked(false);
       renderGame();
     });
@@ -1984,10 +2005,17 @@ function animateSteps(fromIndex, delta, onDone){
   step();
 }
 
+// 도착(랜딩)마다 고유한 값을 하나 발급한다. 미션 완료 트랜잭션에서 "이 도착은 이미 완료 처리됐는지"
+// 판단하는 기준으로 쓰인다 — 단순 난수라 암호학적 보안 용도가 아니라 '구분'이 목적이라 충분하다.
+function generateArrivalId(){
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
 function resolveLanding(index, depth, onFinalDone){
   depth = depth || 0;
   state.position = index;
   state.completionUsed = false; // 새로 도착했으니 이번 칸에서 완료 기회를 다시 준다
+  state.arrivalId = generateArrivalId(); // 새 도착이므로 새 식별자 발급 (완료 트랜잭션이 이 값을 기준으로 삼는다)
   saveState(state);
   cloudSyncPositionNow(); // 위치는 디바운스 없이 바로 클라우드에 반영
   renderCells();
@@ -2251,18 +2279,70 @@ function openMission(index){
     });
   }
   if(completeBtn){
-    completeBtn.addEventListener('click', ()=>{
+    completeBtn.addEventListener('click', async ()=>{
       if(snsCheckbox && !snsCheckbox.checked) return; // SNS 인증 체크 전에는 완료 불가
-      if(!state.completionUsed && getLevel(index) < MAX_LEVEL){
-        setLevel(index, getLevel(index) + 1);
-        const earnedPoints = getLevel(index) * 100; // 1회100점,2회200점,3회300점(마스터)
-        state.score = (state.score || 0) + earnedPoints;
-        state.completionUsed = true; // 이번 도착에서의 완료 기회는 다 썼음
-        cloudIncrement({ ['levels.' + missionIdAt(index)]: 1, score: earnedPoints }); // 클라우드에도 '더하기'로만 안전하게 반영
-        checkLineBonuses(); // 방금 완료로 어떤 변이 다 채워졌는지 확인해서 보너스 지급
+      if(state.completionUsed || getLevel(index) >= MAX_LEVEL){ close(); return; }
+
+      const missionId = missionIdAt(index);
+      const arrivalId = state.arrivalId;
+      const ref = cloudDocRef();
+
+      if(!window.__fb || !ref || !arrivalId){
+        // 클라우드 연결이 없으면 트랜잭션 자체가 불가능하다. 로컬에서만 완료 처리하면
+        // 다른 탭/기기와 또 어긋날 수 있어서, 여기선 안전하게 막고 재시도를 안내한다.
+        showToast('⚠️ 네트워크 연결을 확인하고 다시 시도해주세요');
+        return;
+      }
+
+      completeBtn.disabled = true;
+      completeBtn.textContent = '처리 중...';
+
+      try{
+        // 트랜잭션 안에서 서버의 '지금 이 순간' 데이터를 직접 읽어서 판단하기 때문에,
+        // 다른 탭이 0.1초 전에 먼저 완료 처리를 끝냈어도 이 트랜잭션은 그 사실을 확실히 보고 중단한다.
+        // (로컬 state.completionUsed 같은 값은 절대 이 판단에 안 쓴다 — 그게 바로 두 탭이 동시에
+        //  통과해버리던 원래 버그의 원인이었다)
+        const result = await window.__fb.runTransaction(window.__fb.db, async (tx)=>{
+          const snap = await tx.get(ref);
+          if(!snap.exists()) return { already:true };
+          const data = snap.data();
+          if(data.completedArrivalId === arrivalId){
+            return { already:true }; // 이미 이 도착에 대해 다른 탭/기기가 완료 처리를 끝냄
+          }
+          const currentLevel = (data.levels && data.levels[missionId]) || 0;
+          if(currentLevel >= MAX_LEVEL){
+            return { already:true }; // 그 사이 이미 마스터 단계까지 도달함
+          }
+          const newLevel = currentLevel + 1;
+          const earnedPoints = newLevel * 100; // 1회100점,2회200점,3회300점(마스터)
+          const newScore = (data.score || 0) + earnedPoints;
+          tx.update(ref, {
+            ['levels.' + missionId]: newLevel,
+            score: newScore,
+            completedArrivalId: arrivalId,
+            updatedAt: window.__fb.serverTimestamp(),
+          });
+          return { already:false, newLevel, earnedPoints, newScore };
+        });
+
+        if(result.already){
+          state.completionUsed = true; // 이미 처리된 도착이므로 이 탭도 완료 상태로 맞춘다
+          showToast('이미 다른 화면에서 완료 처리됐어요');
+        } else {
+          setLevel(index, result.newLevel);
+          state.score = result.newScore;
+          state.completionUsed = true;
+          checkLineBonuses(); // 방금 완료로 어떤 변이 다 채워졌는지 확인해서 보너스 지급
+        }
         saveState(state);
         renderCells();
         refreshProgress();
+      }catch(e){
+        console.warn('미션 완료 트랜잭션 실패:', e);
+        showToast('⚠️ 처리 중 문제가 생겼어요, 다시 시도해주세요');
+        completeBtn.disabled = false;
+        completeBtn.textContent = '미션 완료';
+        return;
       }
       close();
     });
@@ -2529,6 +2609,21 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
     state.position = cloudData.position;
     changed = true;
   }
+  // 위치를 믿고 따라가는 상황(trustPosition)이라면, 그 위치에 딸린 도착 식별자(arrivalId)와
+  // 완료 여부(completionUsed)도 같이 맞춰준다 — 안 그러면 이 탭이 옛 arrivalId를 들고 있다가
+  // 미션 완료 트랜잭션에서 엉뚱한 값으로 비교하게 된다.
+  if(trustPosition && typeof cloudData.arrivalId === 'string' && cloudData.arrivalId !== state.arrivalId){
+    state.arrivalId = cloudData.arrivalId;
+    state.completionUsed = !!cloudData.completionUsed;
+    changed = true;
+  }
+  // 같은 도착(arrivalId)에 대해 다른 탭이 이미 미션 완료를 끝냈다면, 이 탭도 "완료됨"으로 맞춘다.
+  // (완료 자체는 트랜잭션이 막아주지만, 버튼을 계속 눌러볼 수 있는 상태로 두면 UX상 혼란스러우니
+  //  실시간으로 알게 되는 즉시 버튼을 비활성 상태로 갱신해준다)
+  if(cloudData.completedArrivalId && cloudData.completedArrivalId === state.arrivalId && !state.completionUsed){
+    state.completionUsed = true;
+    changed = true;
+  }
 
   // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 "OR 병합"한다.
   // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
@@ -2605,12 +2700,17 @@ function startParticipantListener(){
     // (아직 서버가 확정하지 않은, 이미 이 탭이 알고 있는 내용이라 다시 처리할 필요가 없다)
     if(snap.metadata && snap.metadata.hasPendingWrites) return;
     if(!snap.exists() || !state) return;
-    // 주사위 굴리는 애니메이션 중에는 화면을 건드리지 않는다 (다른 탭 변화 때문에 애니메이션이 끊기는 걸 방지).
-    if(isRolling) return;
+    if(!snap.exists() || !state) return;
     const changed = applyCloudReconciliation(snap.data(), { trustPosition: true });
     if(changed){
       saveState(state);
-      if(currentView === 'hub' || currentView === 'marble') render();
+      // 주사위 애니메이션·무인도 탈출·이벤트 모달 등이 진행 중이면 화면을 지금 건드리지 않고,
+      // isRolling이 꺼지는 순간(markRollingDone) 한꺼번에 반영한다. 데이터 자체는 이미 최신으로 반영됐다.
+      if(isRolling){
+        pendingCloudRender = true;
+      } else if(currentView === 'hub' || currentView === 'marble'){
+        render();
+      }
     }
   }, (err)=>{
     console.warn('실시간 동기화 연결 실패:', err);
