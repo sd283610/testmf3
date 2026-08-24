@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script type="module">
-  // Firebase 연결 (Authentication + Firestore) — 이메일/비밀번호, 구글 로그인으로 참가자를 식별하고,
+  // Firebase 연결 (Authentication + Firestore) — 이메일/비밀번호 로그인으로 참가자를 식별하고,
   // 진행상황은 Firestore에 uid 기준 문서로 저장한다.
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
@@ -19,7 +19,6 @@
   import {
     getAuth, onAuthStateChanged,
     createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    GoogleAuthProvider, signInWithPopup,
     sendPasswordResetEmail, signOut
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
@@ -39,7 +38,7 @@
     window.__fb = {
       db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit,
       auth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut
+      sendPasswordResetEmail, signOut
     };
   }catch(e){
     console.warn('Firebase 초기화 실패 (로컬 저장만 사용됨):', e);
@@ -947,7 +946,7 @@ function mapAuthError(e){
 }
 
 /* =========================================================
-   로그인 / 회원가입 화면 (이메일+비밀번호, 구글)
+   로그인 / 회원가입 화면 (이메일+비밀번호)
    ========================================================= */
 let authMode = 'login'; // 'login' | 'signup'
 
@@ -985,17 +984,6 @@ function renderAuthScreen(){
         <button id="forgot-pw-btn" type="button" class="w-full mt-3 text-xs text-center underline" style="color:var(--text-dim);">
           비밀번호를 잊으셨나요?
         </button>` : ''}
-
-        <div class="flex items-center gap-3 my-5">
-          <div style="flex:1; height:1px; background:var(--line);"></div>
-          <span class="text-xs" style="color:var(--text-dim)">또는</span>
-          <div style="flex:1; height:1px; background:var(--line);"></div>
-        </div>
-
-        <button id="google-btn" type="button" class="w-full py-3 rounded-xl font-display font-bold text-sm flex items-center justify-center gap-2"
-          style="background:#fff; border:1.5px solid var(--line); color:#1f1f1f;">
-          <span style="font-size:16px;">🔎</span> 구글로 계속하기
-        </button>
 
         <a href="https://open.kakao.com/o/ssVl6nGi" target="_blank" rel="noopener noreferrer"
           class="block w-full mt-5 text-xs text-center underline" style="color:var(--text-dim);">
@@ -1041,15 +1029,6 @@ function renderAuthScreen(){
   };
   submitBtn.addEventListener('click', submit);
   pwInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
-
-  document.getElementById('google-btn').addEventListener('click', async ()=>{
-    if(!window.__fb) return;
-    errorMsg.style.display = 'none';
-    try{
-      const provider = new window.__fb.GoogleAuthProvider();
-      await window.__fb.signInWithPopup(window.__fb.auth, provider);
-    }catch(e){ showError(mapAuthError(e)); }
-  });
 
   const forgotBtn = document.getElementById('forgot-pw-btn');
   if(forgotBtn){
@@ -2429,7 +2408,7 @@ function confirmReset(){
   backdrop.innerHTML = `
     <div class="modal-card">
       <h2 class="font-display text-lg font-bold">정말 로그아웃 하시겠습니까?</h2>
-      <p class="text-sm mt-2" style="color:var(--text-dim)">이 기기에서 계정 연결이 끊겨요. 이메일(또는 구글 계정)로 다시 로그인하면 지금까지의 기록 그대로 이어서 진행할 수 있어요.</p>
+      <p class="text-sm mt-2" style="color:var(--text-dim)">이 기기에서 계정 연결이 끊겨요. 이메일로 다시 로그인하면 지금까지의 기록 그대로 이어서 진행할 수 있어요.</p>
       <div class="flex gap-3 mt-6">
         <button id="cancel-reset" class="flex-1 py-3 rounded-xl text-sm font-semibold" style="background:var(--bg-elev-2); color:var(--text);">취소</button>
         <button id="confirm-reset" class="flex-1 py-3 rounded-xl text-sm font-bold text-white" style="background:var(--sunset-1);">로그아웃</button>
