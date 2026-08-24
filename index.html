@@ -14,7 +14,8 @@
   // Firestore 쪽은 "실패해도 무시하고 계속 진행"하는 best-effort 방식으로 붙인다.
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp
+    getFirestore, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp,
+    collection, query, where, getDocs, limit
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -29,7 +30,7 @@
   try{
     const fbApp = initializeApp(firebaseConfig);
     const db = getFirestore(fbApp);
-    window.__fb = { db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp };
+    window.__fb = { db, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, query, where, getDocs, limit };
   }catch(e){
     console.warn('Firebase 초기화 실패 (로컬 저장만 사용됨):', e);
     window.__fb = null;
@@ -796,6 +797,33 @@ async function cloudFetchByNicknamePin(nickname, pin){
   }catch(e){ console.warn('cloud 복구 실패:', e); return null; }
 }
 
+// 같은 닉네임이 '다른 PIN'으로 이미 등록되어 있는지 확인한다.
+// (문서 id가 닉네임+PIN 조합이라, 이 체크가 없으면 PIN만 다르게 하면 같은 닉네임으로
+//  여러 참가자 문서가 생겨버린다 — 신규 가입 직전에만 호출해서 막는다)
+// 반환값: true = 다른 사람이 이미 이 닉네임을 쓰고 있음(가입 차단), false = 사용 가능(또는 확인 실패 시 안전하게 통과)
+async function cloudIsNicknameTakenByOther(nickname, pin){
+  if(!window.__fb) return false;
+  try{
+    const q = window.__fb.query(
+      window.__fb.collection(window.__fb.db, 'participants'),
+      window.__fb.where('nickname', '==', nickname),
+      window.__fb.limit(5)
+    );
+    const snap = await window.__fb.getDocs(q);
+    if(snap.empty) return false;
+    // 같은 닉네임 문서가 있어도, 그게 지금 입력한 PIN과 정확히 같은 문서라면 '기존 내 기록'이므로 허용.
+    let takenByOther = false;
+    snap.forEach(d=>{
+      const data = d.data();
+      if((data.pin || '') !== pin) takenByOther = true;
+    });
+    return takenByOther;
+  }catch(e){
+    console.warn('닉네임 중복 확인 실패:', e);
+    return false; // 확인 자체가 실패하면(오프라인 등) 참가 자체를 막지 않고 통과시킨다
+  }
+}
+
 
 // 날짜가 바뀌었으면 오늘의 주사위 횟수를 리셋한다. 전날 넘어온 무인도 페널티가 있으면 반영한다.
 function ensureDailyRollsFresh(){
@@ -898,6 +926,7 @@ function renderOnboarding(){
           class="w-full mt-2 mb-4 px-4 py-3 rounded-xl outline-none text-base"
           style="background:var(--bg-elev-2); border:1.5px solid var(--line); color:var(--text);">
         <p class="text-xs -mt-3 mb-4" style="color:var(--text-dim)">기기를 바꾸거나 기록이 사라졌을 때 복구하는 데 쓰여요. 꼭 기억해두세요!</p>
+        <p id="onboarding-error" class="text-xs -mt-2 mb-4" style="color:var(--sunset-1); display:none;"></p>
 
         <button id="start-btn" class="track-btn w-full mt-6 py-3 rounded-xl font-display font-bold text-white text-sm">
           마라닉 프렌즈 9기 시작하기
@@ -914,9 +943,11 @@ function renderOnboarding(){
   const nicknameInput = document.getElementById('nickname-input');
   const pinInput = document.getElementById('pin-input');
   const btn = document.getElementById('start-btn');
+  const errorMsg = document.getElementById('onboarding-error');
   const submit = async ()=>{
     const nickVal = nicknameInput.value.trim();
     const pinVal = pinInput.value.trim();
+    errorMsg.style.display = 'none';
     if(!nickVal){ nicknameInput.focus(); nicknameInput.style.borderColor = 'var(--sunset-1)'; return; }
     if(!/^\d{4}$/.test(pinVal)){ pinInput.focus(); pinInput.style.borderColor = 'var(--sunset-1)'; return; }
 
@@ -933,6 +964,18 @@ function renderOnboarding(){
       saveState(state);
       showToast('☁️ 기존 기록을 불러왔어요');
       render();
+      return;
+    }
+
+    // 정확히 같은 닉네임+PIN 기록은 없지만, 같은 닉네임을 '다른 PIN'으로 누군가 이미 쓰고 있다면
+    // 새 문서를 만들지 않고 막는다 (닉네임 중복 방지).
+    const takenByOther = await cloudIsNicknameTakenByOther(nickVal, pinVal);
+    if(takenByOther){
+      errorMsg.textContent = '이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해주세요.';
+      errorMsg.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = originalText;
+      nicknameInput.focus();
       return;
     }
 
