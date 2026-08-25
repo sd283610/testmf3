@@ -2070,6 +2070,13 @@ function openMission(index){
           style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
       </div>
       <p class="text-sm mt-4 leading-relaxed" style="color:var(--text-dim)">${escapeHtmlMultiline(mission.desc)}</p>
+      ${mission.videoUrl ? `
+        <a href="${escapeHtml(mission.videoUrl)}" target="_blank" rel="noopener noreferrer"
+          class="w-full mt-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+          style="background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text);">
+          🎥 동작 영상으로 보기
+        </a>
+      ` : ''}
       ${footerHtml}
     </div>
   `;
