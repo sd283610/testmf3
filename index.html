@@ -541,20 +541,6 @@ const PROGRAM_GUIDES = {
   },
 };
 
-// 러닝마블 규칙 안내문
-const MARBLE_GUIDE = {
-  title: '🎲 러닝마블 규칙',
-  paragraphs: [],
-  bullets: [
-    '러닝마블은 선택적인 특별 미션이지만, 완료 횟수에 따라 우수 마프 확률이 올라가요.',
-    '러닝마블은 하나의 탭에서만 진행해주세요. 동시에 여러 탭·기기를 사용하면 기록이 꼬일 수 있어요.',
-    '특별 미션은 기본 미션과 함께 인증해야 해요. 밴드 또는 인스타그램에 30분 이상 달리기·걷기 기록과 특별 미션 인증을 함께 올려주세요.',
-    '같은 미션은 최대 3회까지 완료할 수 있어요.',
-    '주사위 2개를 하루에 한 번 던질 수 있고, 두 눈이 같은 숫자(더블)가 나오면 보너스 주사위가 1회 추가돼요.',
-    '출발선(START)에 도착하거나 지나치면 보너스 찬스가 1회 추가돼요.',
-  ],
-};
-
 
 
 /* =========================================================
@@ -757,7 +743,11 @@ function scheduleCloudSync(){
     try{
       const ref = cloudDocRef();
       if(!ref) return;
-      const { score, levels, bonusRolls, ...rest } = state; // score/levels/bonusRolls는 increment 전용, 통짜 덮어쓰기에서 제외
+      // score/levels/bonusRolls는 increment 전용이라 통짜 덮어쓰기에서 제외.
+      // position도 여기서 빼야 한다 — 위치는 오직 cloudSyncPositionNow()만 책임지는 전용 경로로 관리한다.
+      // (여기서 같이 써버리면, 다른 탭이 방금 정확히 저장해둔 최신 위치를, 이 탭이 갖고 있던
+      //  오래된 위치 값으로 다시 덮어써버리는 사고가 난다 — 실제로 있었던 버그다)
+      const { score, levels, bonusRolls, position, ...rest } = state;
       await window.__fb.setDoc(ref, { ...rest, uid: currentUser.uid, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
     }catch(e){ console.warn('cloud 동기화 실패:', e); }
   })();
@@ -1468,11 +1458,7 @@ function openProgramGuide(programKey){
   openGuideModal(PROGRAM_GUIDES[programKey]);
 }
 
-function openMarbleGuide(){
-  openGuideModal(MARBLE_GUIDE);
-}
-
-// '나의 러닝마블 내역' — 주사위(오늘 사용 횟수/보너스), 미션별 완료 횟수, 총점수를 한눈에 모아 보여준다.
+// '나의 러닝마블 내역' — 미션별 완료 횟수와 완료 이력을 한눈에 모아 보여준다.
 function openMarbleHistoryModal(){
   const totalCompletions = MISSION_INDICES.reduce((sum,i)=> sum + getLevel(i), 0);
 
@@ -1587,10 +1573,10 @@ function renderGame(){
       </h1>
 
       <div class="flex gap-2 mb-4">
-        <button id="marble-guide-btn" type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold"
+        <a href="https://sd283610.github.io/testmf3/rule.html" target="_blank" rel="noopener noreferrer" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-center"
           style="background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
           📖 러닝마블 규칙
-        </button>
+        </a>
         <button id="marble-history-btn" type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold"
           style="background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text);">
           📜 미션 내역
@@ -1639,9 +1625,9 @@ function renderGame(){
             <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm">
               주사위 던지기
             </button>
-            <p class="text-xs text-center" style="color:var(--text-dim)">
+            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">
               ${rollsLeft > 0 ? `오늘 ${rollsLeft}/${MAX_ROLLS_PER_DAY}번 남음` : '오늘 기본 횟수 소진'}
-              ${bonusRolls > 0 ? ` · 🎁 보너스 ${bonusRolls}개` : ''}
+              ${bonusRolls > 0 ? `<br>🎁 보너스 주사위 ${bonusRolls}회` : ''}
             </p>
           ` : `
             <div style="display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="display:flex; gap:8px;"><div id="dice1" class="die"></div><div id="dice2" class="die"></div></div><div id="dice-sum" class="font-display font-bold" style="font-size:13px; color:var(--sunset-1); min-height:16px;"></div></div>
@@ -1666,7 +1652,6 @@ function renderGame(){
   if(rollBtn) rollBtn.addEventListener('click', handleRollClick);
   document.getElementById('marble-back-btn').addEventListener('click', goToHub);
   document.getElementById('marble-refresh-btn').addEventListener('click', handleManualRefresh);
-  document.getElementById('marble-guide-btn').addEventListener('click', openMarbleGuide);
   document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
   document.getElementById('dashboard-title').addEventListener('click', handleAdminTap);
 }
