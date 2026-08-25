@@ -1666,6 +1666,8 @@ function renderGame(){
         📜 나의 러닝마블 내역 보기
       </button>
 
+      <div id="pending-missions-btn-wrap">${buildPendingMissionsButtonHtml()}</div>
+
       <div class="mb-16 rounded-2xl p-4 flex items-center justify-between gap-4" style="background:var(--bg-elev); border:1px solid var(--line);">
         <div>
           <span class="text-xs" style="color:var(--text-dim)">총 완료 개수</span>
@@ -1676,8 +1678,6 @@ function renderGame(){
           <div id="progress-score" class="font-display text-2xl font-bold" style="color:var(--level4)">${state.score || 0}<span class="text-sm font-semibold" style="color:var(--text-dim)"> 점</span></div>
         </div>
       </div>
-
-      <div id="pending-missions-banner-wrap">${buildPendingBannerHtml()}</div>
 
       <div id="board-wrap">
         <div id="board-field"></div>
@@ -1743,46 +1743,74 @@ function renderGame(){
   document.getElementById('marble-guide-btn').addEventListener('click', openMarbleGuide);
   document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
   document.getElementById('dashboard-title').addEventListener('click', handleAdminTap);
-  document.querySelectorAll('.pending-mission-chip').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
-      const idx = parseInt(chip.getAttribute('data-pending-idx'), 10);
-      if(!Number.isNaN(idx)) openMission(idx);
-    });
-  });
+  const pendingBtn = document.getElementById('pending-missions-btn');
+  if(pendingBtn) pendingBtn.addEventListener('click', openPendingMissionsModal);
 }
 
-// 완료 대기 중인 미션 배너의 HTML을 만든다 (renderGame 최초 렌더와, renderPendingBanner 갱신 둘 다 재사용).
-function buildPendingBannerHtml(){
+// "나의 러닝마블 내역 보기"와 같은 스타일의, 완료 대기 미션 확인 버튼 HTML을 만든다.
+// 대기 중인 미션이 없으면 아예 렌더링하지 않는다 (버튼 자체가 안 보임).
+function buildPendingMissionsButtonHtml(){
   const pending = getPendingMissions();
   if(pending.length === 0) return '';
-  const chipsHtml = pending.map(p=>{
+  return `
+    <button id="pending-missions-btn" type="button" class="w-full mb-4 py-2.5 rounded-xl text-xs font-bold"
+      style="background:var(--bg-elev-2); border:1px solid var(--level4); color:var(--level4);">
+      ⏰ 완료 대기 중인 미션 (${pending.length})
+    </button>
+  `;
+}
+
+// 버튼 컨테이너만 갱신한다 (renderGame 전체를 다시 그리지 않고, pendingMissions가 바뀌는 시점마다 호출).
+function renderPendingMissionsButton(){
+  const wrap = document.getElementById('pending-missions-btn-wrap');
+  if(!wrap) return; // 러닝마블 화면이 아니면(예: 실시간 이벤트가 다른 화면에서 왔으면) 그냥 건너뛴다
+  wrap.innerHTML = buildPendingMissionsButtonHtml();
+  const btn = document.getElementById('pending-missions-btn');
+  if(btn) btn.addEventListener('click', openPendingMissionsModal);
+}
+
+// "나의 러닝마블 내역 보기"와 같은 팝업 형태로, 완료 대기 중인 미션들을 목록으로 보여준다.
+// 각 항목을 누르면 팝업을 닫고 바로 그 미션의 완료 모달을 연다.
+function openPendingMissionsModal(){
+  const pending = getPendingMissions();
+  const rowsHtml = pending.map(p=>{
     const missionId = missionIdAt(p.index);
     const arrival = state.pendingArrivals && state.pendingArrivals[missionId];
     const visitDate = (arrival && typeof arrival === 'object') ? arrival.date : null;
     const dueLabel = visitDate ? formatShortDate(addDaysToDateStr(visitDate, 1)) : '';
     return `
-      <button type="button" class="pending-mission-chip" data-pending-idx="${p.index}">
+      <button type="button" class="pending-mission-chip mb-2" data-pending-idx="${p.index}">
         <span class="pending-title">${p.mission.emoji} ${escapeHtml(p.mission.title)}</span>
         ${dueLabel ? `<span class="pending-due">${dueLabel}까지</span>` : ''}
       </button>
     `;
   }).join('');
-  return `
-    <div id="pending-missions-banner" class="mb-4 rounded-2xl p-3" style="background:var(--bg-elev-2); border:1px solid var(--line);">
-      <p class="text-xs font-bold mb-2" style="color:var(--text-dim)">⏰ 완료 대기 중인 미션 ${pending.length}개 · 눌러서 완료하기</p>
-      <div class="flex flex-col gap-2">${chipsHtml}</div>
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal-card">
+      <div class="flex items-start justify-between">
+        <h2 class="font-display text-lg font-bold">⏰ 완료 대기 중인 미션</h2>
+        <button id="modal-close" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style="background:var(--bg-elev-2); color:var(--text-dim);">✕</button>
+      </div>
+      <p class="text-xs mt-2" style="color:var(--text-dim)">방문했지만 아직 완료 처리 안 한 미션이에요. 눌러서 바로 완료할 수 있어요.</p>
+      <div class="mt-4">
+        ${rowsHtml || `<p class="text-sm" style="color:var(--text-dim)">완료 대기 중인 미션이 없어요.</p>`}
+      </div>
+      <button id="modal-confirm" class="w-full mt-2 py-3 rounded-xl font-display font-bold text-sm" style="background:var(--bg-elev-2); color:var(--text);">닫기</button>
     </div>
   `;
-}
-
-// 배너 컨테이너만 갱신한다 (renderGame 전체를 다시 그리지 않고, pendingMissions가 바뀌는 시점마다 호출).
-function renderPendingBanner(){
-  const wrap = document.getElementById('pending-missions-banner-wrap');
-  if(!wrap) return; // 러닝마블 화면이 아니면(예: 실시간 이벤트가 다른 화면에서 왔으면) 그냥 건너뛴다
-  wrap.innerHTML = buildPendingBannerHtml();
-  wrap.querySelectorAll('.pending-mission-chip').forEach(chip=>{
+  document.body.appendChild(backdrop);
+  const close = ()=> backdrop.remove();
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-close').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', close);
+  backdrop.querySelectorAll('.pending-mission-chip').forEach(chip=>{
     chip.addEventListener('click', ()=>{
       const idx = parseInt(chip.getAttribute('data-pending-idx'), 10);
+      close();
       if(!Number.isNaN(idx)) openMission(idx);
     });
   });
@@ -2132,7 +2160,7 @@ function resolveLanding(index, depth, onFinalDone){
   saveState(state);
   cloudSyncPositionNow(); // 위치는 디바운스 없이 바로 클라우드에 반영
   renderCells();
-  renderPendingBanner(); // 방금 방문으로 대기 목록이 바뀌었을 수 있으니 배너도 갱신
+  renderPendingMissionsButton(); // 방금 방문으로 대기 목록이 바뀌었을 수 있으니 버튼도 갱신
 
   const mission = MISSIONS[index];
 
@@ -2515,7 +2543,7 @@ function openMission(index){
         }
         saveState(state);
         renderCells();
-        renderPendingBanner(); // 완료/만료 처리로 대기 목록이 바뀌었으니 배너도 갱신
+        renderPendingMissionsButton(); // 완료/만료 처리로 대기 목록이 바뀌었으니 버튼도 갱신
         refreshProgress();
       }catch(e){
         console.warn('미션 완료 트랜잭션 실패:', e);
