@@ -359,8 +359,33 @@ const MISSIONS_SESSION3 = [
   { id:'protein_intake', emoji:'🥦', title:'샐러드 챙겨먹기', desc:'샐러드, 채소 챙겨 먹기' },
 ];
 
-// TODO: 세션4 실제 미션 내용이 정해지면 이 배열만 통째로 교체하면 된다 (지금은 세션3 복사본 placeholder).
-const MISSIONS_SESSION4 = MISSIONS_SESSION3.map(m => ({ ...m }));
+// 세션4 러닝마블 테스트용 — 세션3 미션 내용을 그대로 쓰되, 순서만 무작위로 섞었다 (START는 고정).
+const MISSIONS_SESSION4 = [
+  { id:'start', emoji:'🏁', title:'START', desc:'마라닉프렌즈 9기, 2주간의 러닝 마블이 시작돼요.' },
+  { id:'hydrate', emoji:'🧘‍♂️', title:'힙 브릿지 10개 3세트', desc:'힙 브릿지로 힙업 & 엉덩이 근육 강화, 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/B31LVwR83JY' },
+  { id:'burpee', emoji:'🔥', title:'버피테스트 10개 3세트', desc:'전신 유산소 운동, 횟수는 체력에 맞게 해주세요.' },
+  { id:'icecream_run', emoji:'👟', title:'최애 러닝화 소개', desc:'최애 러닝화와 그 이유 간단하게 작성하기' },
+  { id:'visualize_goal', emoji:'📏', title:'자로 잰 듯한 러닝 거리', desc:'러닝 거리가 5km, 10km처럼 소수점 없이 딱 떨어지도록 러닝 인증하기(±20m 오차 허용)' },
+  { id:'foam_roller', emoji:'💆', title:'폼롤러 마사지', desc:'폼롤러로 종아리, 허벅지 등 마사지하기(마사지건, 손마사지 가능)' },
+  { id:'plank_hold', emoji:'🙇', title:'플랭크 1분 버티기', desc:'코어 강화! 플랭크 버티는 시간은 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/ezfQU2Qzq20' },
+  { id:'calf_stretch', emoji:'🎵', title:'플레이리스트 공유', desc:'요즘 듣는 노래 또는 팟캐스트 공유하기' },
+  { id:'icing', emoji:'🧊', title:'아이싱하기', desc:'무릎, 종아리, 발목 아이싱하기' },
+  { id:'protein_intake', emoji:'🥦', title:'샐러드 챙겨먹기', desc:'샐러드, 채소 챙겨 먹기' },
+  { id:'pushup', emoji:'💪', title:'팔굽혀펴기 10개 3세트', desc:'무릎 대고 해도 괜찮고 할 수 있는 만큼만 하셔도 좋아요! 횟수는 체력에 맞게 해주세요.' },
+  { id:'sky_photo', emoji:'👍', title:'러닝템 소개하기', desc:'가성비/품질 좋은/실패 없는 러닝 아이템 소개하기\n(러닝화 빼고 러닝 관련 모든 아이템)' },
+  { id:'running_haiku', emoji:'🦘', title:'점프 스쿼트 10개 3세트', desc:'스쿼트 앉았다가 일어서면서 점프, 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/Oum0wsguV8c' },
+  { id:'course_photo', emoji:'®️', title:'알파벳 R 찾기', desc:'건물 간판에 알파벳 R을 찾으면서 달리세요!' },
+  { id:'running_score', emoji:'👣', title:'피치 30회', desc:'러닝 전 심박을 올리고 몸을 데우기 좋습니다. \n가벼운 조깅일 경우 로우 피치만 해도 충분하고 페이스를 올리는 날에는 미들피치와 하이피치까지 하면 좋습니다. 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/mR6fLsNbQhg' },
+  { id:'calf_raise', emoji:'🦵', title:'카프레이즈 20개 3세트', desc:'러닝 전후, 평상시에도 하기 좋은 카프레이즈 20개 x 3세트, 횟수는 체력에 맞게 해주세요' },
+  { id:'tomorrow_plan', emoji:'🦶', title:'한 발 데드리프트 10개 3세트', desc:'엉덩이 근육 강화에 도움이 되는 운동. 횟수는 체력에 맞게 해주세요', videoUrl:'https://www.youtube.com/shorts/OQ-UxiJ_QbM' },
+  { id:'wide_squat', emoji:'🍵', title:'오늘 차 한 잔 어때요?', desc:'차 한 잔 마시기(커피, 디카페인, 녹차, 보리차, 페퍼민트 등 차 종류 상관없음)' },
+  { id:'dynamic_stretch', emoji:'🤸‍♂️', title:'사이드 플랭크 1분 버티기', desc:'측면 코어 강화, 버티는 시간은 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/3GOvHDWR6qc' },
+  { id:'eggs', emoji:'🥛', title:'단백질 챙겨먹기', desc:'우유, 고기, 닭가슴살, 달걀, 생선, 연어, 콩, 두부, 프로틴 쉐이크 등 단백질이 많이 포함된 음식 먹기' },
+  { id:'uphill', emoji:'🪜', title:'계단 오르기', desc:'계단 5층 이상 오르기' },
+  { id:'walking_lunge', emoji:'🦵🏻', title:'사이드 런지 20개 3세트', desc:'안쪽 허벅지 자극 사이드런지 런지, 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/Ok_nkpYqUxE' },
+  { id:'bread_run', emoji:'🧘', title:'고관절 스트레칭 20회 씩', desc:'러닝 전 고관절 스트레칭하기', videoUrl:'https://www.youtube.com/shorts/WT_EYv3232E' },
+  { id:'mindful_run', emoji:'🧱', title:'벽 스쿼트 1분 버티기', desc:'스쿼트 자세로 벽에 기대어 1분 버티기. 버티는 시간은 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/p3xChSWRx9w' },
+];
 
 // 지금 화면에 쓰는 미션 배열 — 세션 탭을 전환할 때 switchToSession()이 이 포인터를 바꿔치기한다.
 let MISSIONS = MISSIONS_SESSION3;
@@ -482,19 +507,106 @@ const TRAINING_PROGRAMS_SESSION3 = {
   trainingFullRecord: { data: TRAINING_FULL_RECORD, title: '📈 풀코스 기록반', subtitle: '8/30 ~ 9/12 · 세션3' },
 };
 
-// TODO: 세션4 실제 훈련 스케줄이 정해지면 이 부분을 교체한다 (지금은 세션3 내용을 복사한 placeholder + 날짜/라벨만 세션4로 바꿔둔 상태).
+// 10K 훈련 프로그램 (세션4, 9/13~9/30 — 7·8주차는 온전한 한 주, 9주차는 세션 종료일까지 4일만)
+const TRAINING_10K_SESSION4 = [
+  { week:7, date:'9/13 (일)', activity:'30분 걷기', desc:'30분 이상 산책' },
+  { week:7, date:'9/14 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/15 (화)', activity:'(8분 뛰기 + 2분 걷기) × 4세트', desc:'- 준비 스트레칭 5분\n- (8분 달리기 + 2분 걷기) × 4세트\n- 정리 스트레칭' },
+  { week:7, date:'9/16 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:7, date:'9/17 (목)', activity:'(8분 뛰기 + 2분 걷기) × 6세트', desc:'- 준비 스트레칭 5분\n- (8분 달리기 + 2분 걷기) × 6세트\n- 정리 스트레칭' },
+  { week:7, date:'9/18 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/19 (토)', activity:'60분 조깅', desc:'- 준비 스트레칭 5분\n- 60분 가볍게 조깅(가능한 60분 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:8, date:'9/20 (일)', activity:'30분 걷기', desc:'30분 이상 산책' },
+  { week:8, date:'9/21 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:8, date:'9/22 (화)', activity:'30분 조깅', desc:'- 준비 스트레칭 5분\n- 30분 가볍게 조깅(가능한 30분 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:8, date:'9/23 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:8, date:'9/24 (목)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가능한 연속으로 달리기\n- 정리 스트레칭' },
+  { week:8, date:'9/25 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:8, date:'9/26 (토)', activity:'10km 달리기 도전!!', desc:'- 준비 스트레칭 5분\n- 가능한 10km 연속으로 달리기\n- 정리 스트레칭' },
+  { week:9, date:'9/27 (일)', activity:'30분 걷기', desc:'30분 이상 산책' },
+  { week:9, date:'9/28 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:9, date:'9/29 (화)', activity:'20분 조깅', desc:'- 준비 스트레칭 5분\n- 20분 가볍게 조깅(가능한 20분 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:9, date:'9/30 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+];
+
+// 하프 마라톤 훈련 프로그램 (세션4, 9/13~9/30)
+const TRAINING_HALF_SESSION4 = [
+  { week:7, date:'9/13 (일)', activity:'90분 조깅', desc:'- 준비 스트레칭 5분\n- 90분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:7, date:'9/14 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/15 (화)', activity:'7km 조깅', desc:'- 준비 스트레칭 5분\n- 7km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:7, date:'9/16 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:7, date:'9/17 (목)', activity:'조깅 30분 / 언덕 훈련 20분', desc:'- 준비 스트레칭 5분\n- 오르막 훈련전 30분 웜업으로 조깅\n- 경사가 있는 오르막 코스에서 20분 달리기\n- 오르막은 조금 빠르게 오르고 내리막은 가볍게 달리며 회복하세요\n- 정리 스트레칭' },
+  { week:7, date:'9/18 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/19 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:8, date:'9/20 (일)', activity:'15km 조깅', desc:'- 준비 스트레칭 5분\n- 15km 달리기\n- 정리 스트레칭\n달리기와 걷기를 조합해도 괜찮아요' },
+  { week:8, date:'9/21 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:8, date:'9/22 (화)', activity:'30분 조깅', desc:'- 준비 스트레칭 5분\n- 30분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:8, date:'9/23 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+  { week:8, date:'9/24 (목)', activity:'5km 조깅 + 질주 5회', desc:'- 준비 스트레칭 5분\n- 5km조깅 -> (50m 질주(60%) + 걷기 회복) x 5회\n- 정리 스트레칭' },
+  { week:8, date:'9/25 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:8, date:'9/26 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:9, date:'9/27 (일)', activity:'60분 조깅', desc:'- 준비 스트레칭 5분\n- 60분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:9, date:'9/28 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:9, date:'9/29 (화)', activity:'30분 조깅', desc:'- 준비 스트레칭 5분\n- 30분 가볍게 조깅(가능한 연속으로 달리기)\n- 정리 스트레칭' },
+  { week:9, date:'9/30 (수)', activity:'휴식 또는 걷기', desc:'(선택)보강운동: 스쿼트, 런지, 플랭크 등' },
+];
+
+// 풀코스 마라톤(첫 완주) 훈련 프로그램 (세션4, 9/13~9/30)
+const TRAINING_FULL_SESSION4 = [
+  { week:7, date:'9/13 (일)', activity:'18km 조깅', desc:'- 준비 스트레칭 5분\n- 18km 달리기\n- 정리 스트레칭\n- 달리기와 걷기를 조합해도 괜찮아요\n- 급수와 에너지젤 먹는 연습도 같이 하면 좋아요' },
+  { week:7, date:'9/14 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/15 (화)', activity:'20분 조깅', desc:'- 준비 스트레칭 5분\n- 20분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:7, date:'9/16 (수)', activity:'근력운동', desc:'스쿼트, 런지, 플랭크 등' },
+  { week:7, date:'9/17 (목)', activity:'40분 조깅', desc:'- 준비 스트레칭 5분\n- 40분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:7, date:'9/18 (금)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:7, date:'9/19 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:8, date:'9/20 (일)', activity:'32km LSD', desc:'- 준비 스트레칭 5분\n- 32km 느린 페이스로 달리기\n- 정리 스트레칭\n- 달리기와 걷기를 조합해도 괜찮아요\n- 급수와 에너지젤 먹는 연습도 같이 하면 좋아요' },
+  { week:8, date:'9/21 (월)', activity:'휴식 또는 걷기', desc:'장거리 훈련 후 회복' },
+  { week:8, date:'9/22 (화)', activity:'휴식 또는 걷기', desc:'장거리 훈련 후 회복' },
+  { week:8, date:'9/23 (수)', activity:'30분 조깅', desc:'- 준비 스트레칭 5분\n- 30분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:8, date:'9/24 (목)', activity:'근력운동', desc:'스쿼트, 런지, 플랭크 등' },
+  { week:8, date:'9/25 (금)', activity:'20분 조깅', desc:'- 준비 스트레칭 5분\n- 20분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:8, date:'9/26 (토)', activity:'3km 조깅', desc:'- 준비 스트레칭 5분\n- 3km 가볍게 달리기\n- 정리 스트레칭' },
+  { week:9, date:'9/27 (일)', activity:'60분 조깅', desc:'- 준비 스트레칭 5분\n- 60분 가볍게 달리기\n- 정리 스트레칭' },
+  { week:9, date:'9/28 (월)', activity:'휴식 또는 걷기', desc:'휴식 또는 걷기' },
+  { week:9, date:'9/29 (화)', activity:'5km 조깅 + 질주 3회', desc:'- 준비 스트레칭 5분\n- 5km 가볍게 달리기\n- (100m 질주 + 100m 회복) X 3세트\n- 정리 스트레칭' },
+  { week:9, date:'9/30 (수)', activity:'근력운동', desc:'스쿼트, 런지, 플랭크 등' },
+];
+
+// 풀코스 기록반 훈련 프로그램 (세션4, 9/13~9/30)
+const TRAINING_FULL_RECORD_SESSION4 = [
+  { week:7, date:'9/13 (일)', activity:'LSD 26km', desc:'- 준비 스트레칭 5분\n- 26km 편안한 페이스로 조깅 (MP+60초)\n- 정리 스트레칭' },
+  { week:7, date:'9/14 (월)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:7, date:'9/15 (화)', activity:'회복조깅 40분', desc:'- 준비 스트레칭 5분\n- 회복조깅 40분 (MP+90~120초)\n- 정리 스트레칭' },
+  { week:7, date:'9/16 (수)', activity:'조깅 60분', desc:'- 준비 스트레칭 5분\n- 조깅 60분 (MP+60초)\n- 정리 스트레칭' },
+  { week:7, date:'9/17 (목)', activity:'템포런 5km', desc:'- 준비 스트레칭 5분\n- 워밍업 조깅 15분\n- 템포런 5km (MP-10초)\n- 쿨다운 조깅 10분\n- 정리 스트레칭' },
+  { week:7, date:'9/18 (금)', activity:'조깅 60분', desc:'- 준비 스트레칭 5분\n- 조깅 60분 (MP+60초)\n- 정리 스트레칭' },
+  { week:7, date:'9/19 (토)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:8, date:'9/20 (일)', activity:'LSD 32km', desc:'- 준비 스트레칭 5분\n- 32km 페이스 MP+60초\n- 정리 스트레칭' },
+  { week:8, date:'9/21 (월)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:8, date:'9/22 (화)', activity:'회복조깅 30분', desc:'- 준비 스트레칭 5분\n- 회복조깅 30분 (MP+90~120초)\n- 정리 스트레칭' },
+  { week:8, date:'9/23 (수)', activity:'조깅 10km', desc:'- 준비 스트레칭 5분\n- 조깅 10km (MP+60초)\n- 정리 스트레칭' },
+  { week:8, date:'9/24 (목)', activity:'조깅 30분 + 질주 3회', desc:'- 준비 스트레칭 5분\n- 조깅 30분 (MP+60초)\n- (100m 질주 + 100m 회복) X 3세트\n- 정리 스트레칭' },
+  { week:8, date:'9/25 (금)', activity:'조깅 10km', desc:'- 준비 스트레칭 5분\n- 조깅 10km (MP+60초)\n- 정리 스트레칭' },
+  { week:8, date:'9/26 (토)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:9, date:'9/27 (일)', activity:'조깅 70분', desc:'- 준비 스트레칭 5분\n- 조깅 70분 (MP+60초)\n- 정리 스트레칭' },
+  { week:9, date:'9/28 (월)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+  { week:9, date:'9/29 (화)', activity:'조깅 60분 + 질주 3회', desc:'- 준비 스트레칭 5분\n- 조깅 60분 (MP+60초)\n- (100m 질주 + 100m 회복) X 3세트\n- 정리 스트레칭' },
+  { week:9, date:'9/30 (수)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
+];
+
 const TRAINING_PROGRAMS_SESSION4 = {
-  training10k: { data: JSON.parse(JSON.stringify(TRAINING_10K)), title: '👟 첫 10K 도전', subtitle: '9/13 ~ 9/30 · 세션4' },
-  trainingHalf: { data: JSON.parse(JSON.stringify(TRAINING_HALF)), title: '🏃 첫 하프 마라톤', subtitle: '9/13 ~ 9/30 · 세션4' },
-  trainingFull: { data: JSON.parse(JSON.stringify(TRAINING_FULL)), title: '🏃‍♂️ 첫 풀코스 완주', subtitle: '9/13 ~ 9/30 · 세션4' },
-  trainingFullRecord: { data: JSON.parse(JSON.stringify(TRAINING_FULL_RECORD)), title: '📈 풀코스 기록반', subtitle: '9/13 ~ 9/30 · 세션4' },
+  training10k: { data: TRAINING_10K_SESSION4, title: '👟 첫 10K 도전', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingHalf: { data: TRAINING_HALF_SESSION4, title: '🏃 첫 하프 마라톤', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingFull: { data: TRAINING_FULL_SESSION4, title: '🏃‍♂️ 첫 풀코스 완주', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingFullRecord: { data: TRAINING_FULL_RECORD_SESSION4, title: '📈 풀코스 기록반', subtitle: '9/13 ~ 9/30 · 세션4' },
 };
 
 // 지금 화면에 쓰는 훈련 프로그램 — 세션 탭 전환 시 switchToSession()이 이 포인터를 바꿔치기한다.
 let TRAINING_PROGRAMS = TRAINING_PROGRAMS_SESSION3;
 
 // 각 훈련 프로그램 안내문 (진행률 카드 아래 '여기를 먼저 눌러주세요' 버튼에서 표시)
-const PROGRAM_GUIDES = {
+const PROGRAM_GUIDES_SESSION3 = {
   training10k: {
     title: '👟 10K 도전 안내',
     paragraphs: [
@@ -551,6 +663,81 @@ const PROGRAM_GUIDES = {
       '템포런: MP -10초',
       '인터벌: MP -15~25초',
       '질주: 최대 속도의 80%',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
+    ],
+  },
+};
+
+// 지금 화면에 쓰는 훈련 프로그램 안내문 — 세션 탭 전환 시 switchToSession()이 이 포인터를 바꿔치기한다.
+let PROGRAM_GUIDES = PROGRAM_GUIDES_SESSION3;
+
+const PROGRAM_GUIDES_SESSION4 = {
+  training10k: {
+    title: '👟 10K 도전 안내',
+    paragraphs: [
+      '이 프로그램은 10km 첫 완주를 목표로 하는 플랜이에요. 달리기를 시작한 누구나 이 훈련을 통해 10km를 완주할 수 있도록 도와줄 거예요.',
+      '세션4 <10km 완주를 향해 가는 구간>\n이제 10km 완주가 눈앞이에요. 무리해서 페이스를 올리기보다 몸 상태를 아끼면서 9/26일 10km 도전일까지 컨디션을 끌어올리세요.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 토요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '뛰는 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
+    ],
+  },
+  trainingHalf: {
+    title: '🏃 하프 마라톤 안내',
+    paragraphs: [
+      '이 프로그램은 하프 마라톤 첫 완주를 목표로 하는 플랜이에요. 10km를 완주해 본 러너라면, 이 훈련을 통해 하프 마라톤까지 완주할 수 있도록 도와줄 거예요.',
+      '세션4 <완주가 눈앞에 보이는 구간>\n이제 10km를 넘어 중장거리 페이스에도 어느 정도 익숙해졌을 거예요. 15km 훈련까지 잘 소화하면 완주까지 정말 얼마 남지 않았습니다.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 일요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '조깅 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '대회 D-21~28: 넉넉하게 대회 4주 전까지는 마지막 15km 이상 LSD 훈련을 끝내는게 좋고, 늦어도 대회 3주 전까지는 마지막 LSD를 끝내고 충분한 회복 기간을 확보해 주세요.',
+      '대회 D-14: 본격적인 테이퍼링 구간. 무리한 장거리나 강도 높은 훈련은 피하고 가벼운 조깅으로 몸을 풀어주세요.',
+      '대회 D-7: 러닝량을 평소의 50% 수준으로 줄이고, 짧은 조깅과 스트레칭 위주로 컨디션을 유지하며 충분한 수면과 영양 섭취로 몸 상태를 최적화하세요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
+    ],
+  },
+  trainingFull: {
+    title: '🏃\u200d♂️ 첫 풀코스 완주 안내',
+    paragraphs: [
+      '이 프로그램은 풀코스 첫 완주를 목표로 하는 플랜이에요. 하프 마라톤을 완주해 본 러너라면, 이 훈련을 통해 풀코스까지 완주할 수 있도록 도와줄 거예요.',
+      '세션4 <완주가 눈앞에 보이는 구간>\n이제 장거리에도 어느 정도 익숙해졌을 거예요. 25km, 그리고 이 프로그램의 최고점인 32km LSD까지 남은 두 번의 큰 장거리를 잘 소화하면 완주까지 정말 얼마 남지 않았습니다.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '매주 일요일은 거리를 늘리는 훈련을 진행해요. 훈련 중 힘들면 중간중간 숨을 돌리며 걸으셔도 괜찮아요.',
+      '조깅 속도는 달리면서 대화 가능한 속도로 달리면 돼요.',
+      '대회 D-21~28: 넉넉하게 대회 4주 전까지 LSD 훈련을 마치는 게 좋고, 늦어도 대회 3주 전까지는 마지막 LSD를 끝내고 충분한 회복 기간을 확보해 주세요.',
+      '대회 D-14: 본격적인 테이퍼링 구간. 장거리나 강도 높은 훈련은 넣지 말고 짧은 조깅으로 몸을 가볍게 풀어주세요.',
+      '대회 D-7: 러닝량을 평소의 50%까지 줄이고, 짧은 조깅과 스트레칭 위주로 몸을 가볍게 유지하며, 충분한 수면과 영양 섭취로 컨디션을 최적화하세요.',
+      '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
+      '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
+    ],
+  },
+  trainingFullRecord: {
+    title: '📈 풀코스 기록반 안내',
+    paragraphs: [
+      '이 프로그램은 풀코스 기록 향상을 목표로 하는 플랜이에요. 이미 풀코스 완주 경험이 있으신 분들이 대상이며, 자신의 페이스에 맞게 적용해 훈련하시면 돼요.',
+      '세션4 <완주가 눈앞에 보이는 구간>\n이제 장거리에도 어느 정도 익숙해졌을 거예요. 남은 두 번의 큰 장거리를 잘 소화하면 정말 얼마 남지 않았습니다.',
+    ],
+    bullets: [
+      '각 날짜를 누르면 자세한 훈련 설명을 볼 수 있어요.',
+      '마라톤페이스(MP): 대회 목표 페이스',
+      '조깅: MP +60초',
+      '회복 조깅: MP +90~120초',
+      '템포런: MP -10초',
+      '인터벌: MP -15~25초',
+      '질주: 최대 속도의 80%',
+      '대회 D-21~28: 넉넉하게 대회 4주 전까지 LSD 훈련을 마치는 게 좋고, 늦어도 대회 3주 전까지는 마지막 LSD를 끝내고 충분한 회복 기간을 확보해 주세요.',
+      '대회 D-14: 본격적인 테이퍼링 구간. 장거리나 강도 높은 훈련은 넣지 말고 짧은 조깅으로 몸을 가볍게 풀어주세요.',
+      '대회 D-7: 러닝량을 평소의 50%까지 줄이고, 짧은 조깅과 스트레칭 위주로 몸을 가볍게 유지하며, 충분한 수면과 영양 섭취로 컨디션을 최적화하세요.',
       '훈련 중 물집, 근육통, 컨디션 저하가 느껴지면 훈련량보다 회복을 우선하세요.',
       '훈련 일정과 훈련량은 개인 스케줄과 체력에 따라 조정하셔도 됩니다.',
     ],
@@ -1026,6 +1213,7 @@ function switchToSession(newSession){
   state.completionLog = slice.completionLog;
   MISSIONS = newSession === 'session3' ? MISSIONS_SESSION3 : MISSIONS_SESSION4;
   TRAINING_PROGRAMS = newSession === 'session3' ? TRAINING_PROGRAMS_SESSION3 : TRAINING_PROGRAMS_SESSION4;
+  PROGRAM_GUIDES = newSession === 'session3' ? PROGRAM_GUIDES_SESSION3 : PROGRAM_GUIDES_SESSION4;
   currentView = 'hub';
   render();
 }
@@ -1120,7 +1308,7 @@ function renderAuthScreen(){
   app.innerHTML = `
     <div class="fade-in flex flex-col items-center justify-center" style="min-height:80vh;">
       <img src="${LOGO_DATA_URI}" alt="TIMP - This is my pace" style="width:200px; height:auto; margin-bottom:20px;">
-      <h1 class="font-display text-2xl font-bold text-center leading-snug">마라닉 프렌즈 9기 세션3</h1>
+      <h1 class="font-display text-2xl font-bold text-center leading-snug">마라닉 프렌즈 9기</h1>
       <div class="w-full mt-10 rounded-3xl p-6" style="background:var(--bg-elev); border:1px solid var(--line);">
 
         <div class="flex rounded-xl overflow-hidden mb-5" style="border:1px solid var(--line);">
@@ -1406,12 +1594,13 @@ function openGoalEditModal(){
    ========================================================= */
 function renderHub(){
   const sessionLabel = currentSession === 'session3' ? '세션3' : '세션4';
+  const sessionColor = currentSession === 'session3' ? 'var(--sunset-1)' : 'var(--level2)';
   const session4Locked = !isSession4Revealed();
   app.innerHTML = `
     <div class="fade-in">
       <div class="mb-4 flex justify-center">${miniLogoHtml()}</div>
       <div class="text-center mt-2 mb-6">
-        <p class="text-xl font-semibold tracking-wide uppercase" style="color:var(--text)">마라닉프렌즈 9기 ${sessionLabel}</p>
+        <p class="text-xl font-semibold tracking-wide uppercase" style="color:var(--text)">마라닉프렌즈 9기 <span style="color:${sessionColor}; font-weight:800;">${sessionLabel}</span></p>
         <h1 class="font-display text-2xl font-bold mt-1">
           <span class="sunset-text">${escapeHtml(state.nickname)}</span>님
         </h1>
@@ -1419,11 +1608,11 @@ function renderHub(){
 
       <div class="flex gap-2 mb-8 rounded-xl p-1" style="background:var(--bg-elev-2); border:1px solid var(--line);">
         <button type="button" id="session-tab-session3" class="flex-1 py-2 rounded-lg text-sm font-bold"
-          style="${currentSession==='session3' ? 'background:var(--sunset-1); color:#fff;' : 'background:transparent; color:var(--text-dim);'}">
+          style="${currentSession==='session3' ? 'background:var(--sunset-1); color:#fff;' : 'background:transparent; color:var(--sunset-1);'}">
           세션3
         </button>
         <button type="button" id="session-tab-session4" class="flex-1 py-2 rounded-lg text-sm font-bold"
-          style="${currentSession==='session4' ? 'background:var(--sunset-1); color:#fff;' : 'background:transparent; color:var(--text-dim);'} ${session4Locked ? 'opacity:.6;' : ''}">
+          style="${currentSession==='session4' ? 'background:var(--level2); color:#fff;' : 'background:transparent; color:var(--level2);'} ${session4Locked ? 'opacity:.6;' : ''}">
           세션4 ${session4Locked ? '🔒' : ''}
         </button>
       </div>
@@ -1439,8 +1628,8 @@ function renderHub(){
       ${(currentSession === 'session4' && session4Locked) ? `
         <div class="rounded-2xl p-8 text-center" style="background:var(--bg-elev); border:1px solid var(--line);">
           <div class="text-4xl mb-3">🔒</div>
-          <p class="font-display font-bold text-lg">세션4는 ${formatShortDate(SESSION4_REVEAL_DATE)}에 열립니다</p>
-          <p class="text-xs mt-2" style="color:var(--text-dim)">그 전까지는 세션3 탭에서 계속 진행해주세요</p>
+          <p class="font-display font-bold text-lg"><span style="color:var(--level2);">세션4</span>는 ${formatShortDate(SESSION4_REVEAL_DATE)}에 열립니다</p>
+          <p class="text-xs mt-2" style="color:var(--text-dim)">그 전까지는 <span style="color:var(--sunset-1); font-weight:700;">세션3</span> 탭에서 계속 진행해주세요</p>
         </div>
       ` : `
       <div class="grid grid-cols-2 gap-4">
@@ -1533,7 +1722,9 @@ function renderTrainingProgram(programKey){
   const days = program.data;
   const checks = state[programKey][currentSession] || (state[programKey][currentSession] = {});
   const doneCount = days.filter((_,i)=> !!checks[i]).length;
-  const weeks = [5, 6];
+  // 주차 번호를 하드코딩하지 않고, 실제 데이터에 들어있는 week 값들을 순서대로 뽑아서 쓴다.
+  // (세션3은 5·6주차 2주, 세션4는 7·8·9주차 3주로 주차 수 자체가 달라서 고정값을 쓰면 안 된다)
+  const weeks = [...new Set(days.map(d => d.week))];
 
   const weekHtml = weeks.map(w=>{
     const rows = days.map((day, i)=>{
@@ -1569,7 +1760,7 @@ function renderTrainingProgram(programKey){
       </div>
 
       <h1 class="font-display text-xl font-bold text-center">${program.title}</h1>
-      <p class="text-xs text-center mt-1" style="color:var(--text-dim)">${program.subtitle}</p>
+      <p class="text-xs text-center mt-1" style="color:var(--text-dim)">${program.subtitle.replace(/(세션[34])$/, `<span style="color:${currentSession === 'session3' ? 'var(--sunset-1)' : 'var(--level2)'}; font-weight:700;">$1</span>`)}</p>
 
       <button id="program-guide-btn" type="button" class="w-full mt-6 py-2.5 rounded-xl text-xs font-bold"
         style="background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
@@ -1613,8 +1804,10 @@ function renderTrainingProgram(programKey){
 
 // 문단/불릿 형태의 안내문을 공용 팝업으로 띄운다 (훈련 프로그램 안내, 러닝마블 규칙 안내 등에서 재사용)
 function openGuideModal(guide){
+  const sessionColor = currentSession === 'session3' ? 'var(--sunset-1)' : 'var(--level2)';
+  const colorizeSession = (html) => html.replace(/세션[34]/g, (m) => `<span style="color:${sessionColor}; font-weight:700;">${m}</span>`);
   const paragraphsHtml = (guide.paragraphs || [])
-    .map(p => `<p class="text-sm leading-relaxed" style="color:var(--text-dim)">${escapeHtmlMultiline(p)}</p>`)
+    .map(p => `<p class="text-sm leading-relaxed" style="color:var(--text-dim)">${colorizeSession(escapeHtmlMultiline(p))}</p>`)
     .join('');
   const bulletsHtml = (guide.bullets || []).length ? `
     <ul class="mt-3" style="padding-left:0; list-style:none;">
@@ -1754,6 +1947,7 @@ function renderGame(){
   const notStartedYet = !diceActive; // 세션별 주사위 활성 기간(예: 세션3 8/30~9/12) 밖이면 잠금
   const dateRange = SESSION_DICE_DATES[currentSession];
   const sessionLabel = currentSession === 'session3' ? '세션3' : '세션4';
+  const sessionColor = currentSession === 'session3' ? 'var(--sunset-1)' : 'var(--level2)';
 
   app.innerHTML = `
     <div class="fade-in">
@@ -1761,11 +1955,10 @@ function renderGame(){
         <button id="marble-back-btn" title="뒤로가기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
           style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">←</button>
         ${miniLogoHtml()}
-        <button id="marble-refresh-btn" title="최신 정보 확인하기" class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-          style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">⟳</button>
+        <div class="w-9 h-9 flex-shrink-0"></div>
       </div>
       <h1 id="dashboard-title" class="font-display text-lg font-bold text-center mb-8" style="user-select:none;">
-        <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:var(--text-dim); font-size:0.7em;">${sessionLabel}</span>
+        <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:${sessionColor}; font-size:0.7em; font-weight:800;">${sessionLabel}</span>
       </h1>
 
       <div class="flex gap-2 mb-4">
@@ -1812,7 +2005,7 @@ function renderGame(){
             <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm" disabled style="opacity:.4; cursor:not-allowed;">
               주사위 던지기
             </button>
-            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">${sessionLabel} 러닝마블 기간이 아니에요<br>(${formatShortDate(dateRange.start)}~${formatShortDate(dateRange.end)}에 주사위를 굴릴 수 있어요)</p>
+            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)"><span style="color:${sessionColor}; font-weight:700;">${sessionLabel}</span> 러닝마블 기간이 아니에요<br>(${formatShortDate(dateRange.start)}~${formatShortDate(dateRange.end)}에 주사위를 굴릴 수 있어요)</p>
           ` : allMastered ? `
             <div class="text-3xl">🏆</div>
             <p class="font-display font-bold text-sm text-center px-4" style="color:var(--complete)">모든 미션 마스터!</p>
@@ -1847,7 +2040,6 @@ function renderGame(){
   const rollBtn = document.getElementById('roll-btn');
   if(rollBtn) rollBtn.addEventListener('click', handleRollClick);
   document.getElementById('marble-back-btn').addEventListener('click', goToHub);
-  document.getElementById('marble-refresh-btn').addEventListener('click', handleManualRefresh);
   document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
   document.getElementById('dashboard-title').addEventListener('click', handleAdminTap);
 }
@@ -2592,92 +2784,8 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
   return changed;
 }
 
-async function reconcileWithCloud(){
-  if(!window.__fb || !state || !currentUser) return;
-  try{
-    const ref = cloudDocRef();
-    if(!ref) return;
-    const snap = await window.__fb.getDoc(ref);
-    if(!snap.exists()) return;
-    const changed = applyCloudReconciliation(snap.data());
-    if(changed){
-      saveState(state);
-      if(currentView === 'hub' || currentView === 'marble') render();
-    }
-    return changed;
-  }catch(e){
-    console.warn('cloud 보정 확인 실패:', e);
-    return null; // 확인 자체가 실패한 경우(네트워크 오류 등)
-  }
-}
-
-// 탭/기기 여러 개를 동시에 열어놓고 쓸 때 서로 어긋나는 문제를 막기 위한 실시간 리스너.
-// 어느 탭에서든 주사위를 굴리거나 미션을 완료하면, 다른 모든 탭이 곧바로 그 변화를 알아채고
-// (기존 reconcileWithCloud와 똑같이 '안전한 방향으로만' 병합해서) 화면을 맞춰준다.
-let unsubscribeParticipant = null;
-function startParticipantListener(){
-  stopParticipantListener();
-  if(!window.__fb || !currentUser) return;
-  const ref = cloudDocRef();
-  if(!ref) return;
-  unsubscribeParticipant = window.__fb.onSnapshot(ref, (snap)=>{
-    // 이 탭이 방금 스스로 쓴 내용이 서버 확인 전(local pending write) 단계로 돌아온 이벤트는 건너뛴다.
-    // (아직 서버가 확정하지 않은, 이미 이 탭이 알고 있는 내용이라 다시 처리할 필요가 없다)
-    if(snap.metadata && snap.metadata.hasPendingWrites) return;
-    if(!snap.exists() || !state) return;
-    if(!snap.exists() || !state) return;
-    const changed = applyCloudReconciliation(snap.data(), { trustPosition: true });
-    if(changed){
-      saveState(state);
-      // 주사위 애니메이션·무인도 탈출·이벤트 모달 등이 진행 중이면 화면을 지금 건드리지 않고,
-      // isRolling이 꺼지는 순간(markRollingDone) 한꺼번에 반영한다. 데이터 자체는 이미 최신으로 반영됐다.
-      if(isRolling){
-        pendingCloudRender = true;
-      } else if(currentView === 'hub' || currentView === 'marble'){
-        render();
-      }
-    }
-  }, (err)=>{
-    console.warn('실시간 동기화 연결 실패:', err);
-  });
-}
-function stopParticipantListener(){
-  if(unsubscribeParticipant){
-    unsubscribeParticipant();
-    unsubscribeParticipant = null;
-  }
-}
-
-// '새로고침' 버튼을 눌렀을 때: 화면을 통째로 다시 불러오지 않고,
-// 클라우드 보정만 다시 실행해서 부드럽게 최신 상태로 맞춘다.
-async function handleManualRefresh(){
-  const btn = document.getElementById('marble-refresh-btn');
-  if(!btn || btn.disabled) return;
-  btn.disabled = true;
-  btn.style.opacity = '.5';
-  const ready = await waitForFirebaseReady(3000);
-  if(!ready){
-    showToast('⚠️ 네트워크 연결을 확인해주세요');
-    btn.disabled = false;
-    btn.style.opacity = '1';
-    return;
-  }
-  const result = await reconcileWithCloud();
-  if(result === true){
-    showToast('✅ 최신 정보로 업데이트했어요');
-  } else if(result === false){
-    showToast('이미 최신 상태예요');
-  } else {
-    showToast('⚠️ 확인 중 문제가 생겼어요, 잠시 후 다시 시도해주세요');
-  }
-  btn.disabled = false;
-  btn.style.opacity = '1';
-}
-
 // Firebase는 <script type="module">로 비동기 로드되기 때문에, 페이지가 막 열린 시점엔
-// 아직 window.__fb가 준비 안 됐을 수 있다. 이 함수 없이 reconcileWithCloud()를 바로 부르면
-// "아직 준비 안 됐네" 하고 조용히 포기해버려서, 새로고침해도 클라우드 값을 영영 확인 못 하는 문제가 생긴다.
-// 그래서 최대 5초 동안 0.1초 간격으로 준비될 때까지 기다렸다가 실행한다.
+// 아직 window.__fb가 준비 안 됐을 수 있다. 최대 5초 동안 0.1초 간격으로 준비될 때까지 기다렸다가 실행한다.
 function waitForFirebaseReady(maxWaitMs){
   return new Promise((resolve)=>{
     const start = Date.now();
