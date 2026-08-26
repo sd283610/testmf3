@@ -330,9 +330,9 @@
 const TOTAL_MISSION_CELLS = 23; // 실제 '미션' 칸 개수 (START 제외, 6x8 보드로 늘어나며 14 → 23)
 const MAX_LEVEL = 3; // 완료 단계: 1=초록, 2=파랑, 3=보라(마스터) — 블루마블 건물 업그레이드처럼 최대 3회
 const MAX_ROLLS_PER_DAY = 1; // 하루 최대 주사위 횟수
-const CAMPAIGN_START_DATE = '2026-08-30'; // 러닝마블 주사위를 시작할 수 있는 날짜 (관리자 모드는 예외)
-
-const MISSIONS = [
+// 세션3/세션4는 보드 크기·구조는 같지만(6x8, 24칸) 미션 내용이 서로 다르다.
+// 세션4 내용은 아직 준비 전이라 우선 세션3 내용을 그대로 복사해서 자리만 채워뒀다 — 나중에 이 배열만 교체하면 된다.
+const MISSIONS_SESSION3 = [
   { id:'start', emoji:'🏁', title:'START', desc:'마라닉프렌즈 9기, 2주간의 러닝 마블이 시작돼요.' },
   { id:'walking_lunge', emoji:'🦵🏻', title:'사이드 런지 20개 3세트', desc:'안쪽 허벅지 자극 사이드런지 런지, 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/Ok_nkpYqUxE' },
   { id:'running_haiku', emoji:'🦘', title:'점프 스쿼트 10개 3세트', desc:'스쿼트 앉았다가 일어서면서 점프, 횟수는 체력에 맞게 해주세요.', videoUrl:'https://www.youtube.com/shorts/Oum0wsguV8c' },
@@ -358,6 +358,12 @@ const MISSIONS = [
   { id:'tomorrow_plan', emoji:'🦶', title:'한 발 데드리프트 10개 3세트', desc:'엉덩이 근육 강화에 도움이 되는 운동. 횟수는 체력에 맞게 해주세요', videoUrl:'https://www.youtube.com/shorts/OQ-UxiJ_QbM' },
   { id:'protein_intake', emoji:'🥦', title:'샐러드 챙겨먹기', desc:'샐러드, 채소 챙겨 먹기' },
 ];
+
+// TODO: 세션4 실제 미션 내용이 정해지면 이 배열만 통째로 교체하면 된다 (지금은 세션3 복사본 placeholder).
+const MISSIONS_SESSION4 = MISSIONS_SESSION3.map(m => ({ ...m }));
+
+// 지금 화면에 쓰는 미션 배열 — 세션 탭을 전환할 때 switchToSession()이 이 포인터를 바꿔치기한다.
+let MISSIONS = MISSIONS_SESSION3;
 
 // 배열 순서(자리)가 아니라 미션 고유 id로 완료 기록을 저장/조회하기 위한 헬퍼.
 // 나중에 미션 순서를 바꾸거나 새로 추가해도, id만 그대로면 기존 참가자 기록이 절대 안 섞인다.
@@ -469,12 +475,23 @@ const TRAINING_FULL_RECORD = [
   { week:6, date:'9/12 (토)', activity:'휴식과 스트레칭', desc:'휴식과 스트레칭' },
 ];
 
-const TRAINING_PROGRAMS = {
+const TRAINING_PROGRAMS_SESSION3 = {
   training10k: { data: TRAINING_10K, title: '👟 첫 10K 도전', subtitle: '8/30 ~ 9/12 · 세션3' },
   trainingHalf: { data: TRAINING_HALF, title: '🏃 첫 하프 마라톤', subtitle: '8/30 ~ 9/12 · 세션3' },
-  trainingFull: { data: TRAINING_FULL, title: '🏃\u200d♂️ 첫 풀코스 완주', subtitle: '8/30 ~ 9/12 · 세션3' },
+  trainingFull: { data: TRAINING_FULL, title: '🏃‍♂️ 첫 풀코스 완주', subtitle: '8/30 ~ 9/12 · 세션3' },
   trainingFullRecord: { data: TRAINING_FULL_RECORD, title: '📈 풀코스 기록반', subtitle: '8/30 ~ 9/12 · 세션3' },
 };
+
+// TODO: 세션4 실제 훈련 스케줄이 정해지면 이 부분을 교체한다 (지금은 세션3 내용을 복사한 placeholder + 날짜/라벨만 세션4로 바꿔둔 상태).
+const TRAINING_PROGRAMS_SESSION4 = {
+  training10k: { data: JSON.parse(JSON.stringify(TRAINING_10K)), title: '👟 첫 10K 도전', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingHalf: { data: JSON.parse(JSON.stringify(TRAINING_HALF)), title: '🏃 첫 하프 마라톤', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingFull: { data: JSON.parse(JSON.stringify(TRAINING_FULL)), title: '🏃‍♂️ 첫 풀코스 완주', subtitle: '9/13 ~ 9/30 · 세션4' },
+  trainingFullRecord: { data: JSON.parse(JSON.stringify(TRAINING_FULL_RECORD)), title: '📈 풀코스 기록반', subtitle: '9/13 ~ 9/30 · 세션4' },
+};
+
+// 지금 화면에 쓰는 훈련 프로그램 — 세션 탭 전환 시 switchToSession()이 이 포인터를 바꿔치기한다.
+let TRAINING_PROGRAMS = TRAINING_PROGRAMS_SESSION3;
 
 // 각 훈련 프로그램 안내문 (진행률 카드 아래 '여기를 먼저 눌러주세요' 버튼에서 표시)
 const PROGRAM_GUIDES = {
@@ -556,72 +573,64 @@ function getTodayStr(){
 function normalizeState(parsed){
   if(!parsed) return null;
   try{
-    // 이전 버전(completed 불리언 배열) 데이터 마이그레이션
-    if(parsed && !parsed.levels && parsed.completed){
-      parsed.levels = parsed.completed.map(v => v ? 1 : 0);
-      delete parsed.completed;
+    if(typeof parsed.adminMode !== 'boolean') parsed.adminMode = false;
+    if(typeof parsed.goal !== 'string') parsed.goal = '';
+    if(typeof parsed.privacyConsentAt !== 'number') parsed.privacyConsentAt = null; // 동의 절차 도입 이전 기존 기록 대응
+
+    // 예전 버전(세션 구분 없이 최상위에 바로 위치/레벨 등이 있던 구조) 데이터가 있으면
+    // 세션3 자리로 옮겨준다 (세션 나누기 이전 테스트 기록 대응 — 한 번만 필요한 마이그레이션).
+    if(typeof parsed.position === 'number' && !parsed.session3){
+      parsed.session3 = {
+        position: parsed.position,
+        levels: (typeof parsed.levels === 'object' && parsed.levels) || {},
+        score: typeof parsed.score === 'number' ? parsed.score : 0,
+        dailyRolls: parsed.dailyRolls || { date: getTodayStr(), count: 0 },
+        bonusRolls: typeof parsed.bonusRolls === 'number' ? parsed.bonusRolls : 0,
+        pendingPenalty: typeof parsed.pendingPenalty === 'number' ? parsed.pendingPenalty : 0,
+        completionUsed: !!parsed.completionUsed,
+        arrivalId: typeof parsed.arrivalId === 'string' ? parsed.arrivalId : null,
+        completionLog: Array.isArray(parsed.completionLog) ? parsed.completionLog : [],
+      };
     }
-    if(parsed && !parsed.dailyRolls){
-      parsed.dailyRolls = { date: getTodayStr(), count: 0 };
-    }
-    if(parsed && typeof parsed.adminMode !== 'boolean'){
-      parsed.adminMode = false;
-    }
-    if(parsed && typeof parsed.bonusRolls !== 'number'){
-      parsed.bonusRolls = 0;
-    }
-    if(parsed && typeof parsed.pendingPenalty !== 'number'){
-      parsed.pendingPenalty = 0;
-    }
-    // 목표(goal) 필드가 없는 기존 유저 대응 기본값 추가
-    if(parsed && typeof parsed.goal !== 'string'){
-      parsed.goal = '';
-    }
-    if(parsed && typeof parsed.privacyConsentAt !== 'number'){
-      parsed.privacyConsentAt = null; // 동의 절차 도입 이전 기존 기록 대응 (없으면 null로 남겨둠)
-    }
-    if(parsed && typeof parsed.score !== 'number'){
-      parsed.score = 0;
-    }
-    if(parsed && typeof parsed.completionUsed !== 'boolean'){
-      parsed.completionUsed = false;
-    }
-    if(parsed && typeof parsed.arrivalId !== 'string'){
-      parsed.arrivalId = null;
-    }
-    if(parsed && !Array.isArray(parsed.completionLog)){
-      parsed.completionLog = [];
-    }
-    if(parsed && (typeof parsed.training10k !== 'object' || parsed.training10k === null)){
-      parsed.training10k = {};
-    }
-    if(parsed && (typeof parsed.trainingHalf !== 'object' || parsed.trainingHalf === null)){
-      parsed.trainingHalf = {};
-    }
-    if(parsed && (typeof parsed.trainingFull !== 'object' || parsed.trainingFull === null)){
-      parsed.trainingFull = {};
-    }
-    if(parsed && (typeof parsed.trainingFullRecord !== 'object' || parsed.trainingFullRecord === null)){
-      parsed.trainingFullRecord = {};
-    }
-    // levels를 미션 id 기준 객체로 통일한다.
-    // - 예전 버전(배열 기반)이 남아있으면, '그 배열이 저장되던 시점의 순서'를 정확히 알 수 없으므로
-    //   최대한 앞에서부터 실제 미션 순서(MISSION_INDICES)에 맞춰 최선으로 옮겨준다.
-    // - 지금 버전부터는 항상 id 기반 객체로 저장되므로, 이후로는 미션 순서를 바꾸거나
-    //   새로 추가해도 기존 참가자 기록이 절대 안 섞인다.
-    if(parsed && Array.isArray(parsed.levels)){
-      const oldLevels = parsed.levels;
-      const newLevels = {};
-      MISSION_INDICES.forEach((idx) => {
-        const id = missionIdAt(idx);
-        if(id) newLevels[id] = oldLevels[idx] || 0;
-      });
-      parsed.levels = newLevels;
-      parsed.position = 0; // 예전 위치(배열 인덱스)는 지금 배열 순서와 안 맞을 수 있어 START로 안전하게 리셋
-    }
-    if(parsed && (typeof parsed.levels !== 'object' || parsed.levels === null)){
-      parsed.levels = {};
-    }
+    if(typeof parsed.session3 !== 'object' || parsed.session3 === null) parsed.session3 = freshMarbleSlice();
+    if(typeof parsed.session4 !== 'object' || parsed.session4 === null) parsed.session4 = freshMarbleSlice();
+    [parsed.session3, parsed.session4].forEach(slice=>{
+      if(typeof slice.position !== 'number') slice.position = 0;
+      if(typeof slice.levels !== 'object' || slice.levels === null) slice.levels = {};
+      if(typeof slice.score !== 'number') slice.score = 0;
+      if(!slice.dailyRolls) slice.dailyRolls = { date: getTodayStr(), count: 0 };
+      if(typeof slice.bonusRolls !== 'number') slice.bonusRolls = 0;
+      if(typeof slice.pendingPenalty !== 'number') slice.pendingPenalty = 0;
+      if(typeof slice.completionUsed !== 'boolean') slice.completionUsed = false;
+      if(typeof slice.arrivalId !== 'string') slice.arrivalId = null;
+      if(!Array.isArray(slice.completionLog)) slice.completionLog = [];
+    });
+
+    // 최상위 필드 = '지금 보고 있는 세션'의 작업 사본. currentSession 기준으로 채워준다.
+    const activeSlice = parsed[currentSession] || parsed.session3;
+    parsed.position = activeSlice.position;
+    parsed.levels = activeSlice.levels;
+    parsed.score = activeSlice.score;
+    parsed.dailyRolls = activeSlice.dailyRolls;
+    parsed.bonusRolls = activeSlice.bonusRolls;
+    parsed.pendingPenalty = activeSlice.pendingPenalty;
+    parsed.completionUsed = activeSlice.completionUsed;
+    parsed.arrivalId = activeSlice.arrivalId;
+    parsed.completionLog = activeSlice.completionLog;
+
+    // 훈련 체크리스트도 세션별로 분리된 구조로 통일한다.
+    ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
+      if(typeof parsed[key] !== 'object' || parsed[key] === null){
+        parsed[key] = { session3:{}, session4:{} };
+      } else if(!('session3' in parsed[key]) && !('session4' in parsed[key])){
+        // 예전 버전(세션 구분 없이 바로 {0:true, ...} 형태)이면 세션3 체크리스트로 옮겨준다.
+        parsed[key] = { session3: parsed[key], session4: {} };
+      } else {
+        if(typeof parsed[key].session3 !== 'object' || parsed[key].session3 === null) parsed[key].session3 = {};
+        if(typeof parsed[key].session4 !== 'object' || parsed[key].session4 === null) parsed[key].session4 = {};
+      }
+    });
+
     return parsed;
   }catch(e){ return parsed; }
 }
@@ -629,24 +638,34 @@ function normalizeState(parsed){
 function saveState(state){
   scheduleCloudSync();
 }
-function freshState(nickname, goal){
+// 러닝마블 진행 상황 한 세션 분량(위치/레벨/완료이력 등)의 빈 상태를 만든다.
+// 세션3/세션4가 각각 독립적으로 이 모양의 데이터를 하나씩 갖는다.
+function freshMarbleSlice(){
   return {
-    nickname,
-    goal: goal || '',
     position: 0,
     levels: {}, // 미션 id 기준 완료 레벨 저장 (예: {icing: 2, icecream_run: 1, ...})
     score: 0, // 더 이상 화면에 표시/사용하지 않지만, Firestore 보안 규칙 호환을 위해 필드는 남겨둔다 (항상 0)
     dailyRolls: { date: getTodayStr(), count: 0 },
-    adminMode: false,
     bonusRolls: 0,
-    pendingPenalty: 0, // 무인도 페널티를 오늘 다 못 뺐을 때 내일로 넘기는 빚
+    pendingPenalty: 0, // 무인도 페널티를 오늘 다 못 뺐을 때 내일로 넘기는 빚 (지금은 무인도 자체가 없어 항상 0)
     completionUsed: false, // 이번 도착에서 '미션 완료'를 이미 썼는지 (연타 방지 + 다른 탭 반영용)
     arrivalId: null, // 이번 도착을 식별하는 고유값 — 서버 트랜잭션으로 '이 도착은 이미 완료 처리됐는지' 판단하는 기준
-    completionLog: [], // 미션 완료 이력 — {date, title, points} 순서대로 쌓임 ('나의 러닝마블 내역'에서 시간순으로 보여줌)
-    training10k: {}, // 10K 훈련 프로그램 체크리스트 (day index -> boolean)
-    trainingHalf: {}, // 하프 마라톤 훈련 프로그램 체크리스트
-    trainingFull: {}, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
-    trainingFullRecord: {}, // 풀코스 기록반 훈련 프로그램 체크리스트
+    completionLog: [], // 미션 완료 이력 — {date, title} 순서대로 쌓임 ('나의 러닝마블 내역'에서 시간순으로 보여줌)
+  };
+}
+
+function freshState(nickname, goal){
+  return {
+    nickname,
+    goal: goal || '',
+    adminMode: false,
+    ...freshMarbleSlice(), // 최상위 필드 = '지금 보고 있는 세션'의 작업 사본 (기본값은 세션3으로 시작)
+    session3: freshMarbleSlice(), // 세션3 저장 자리 (세션 전환 시 최상위 필드와 동기화됨)
+    session4: freshMarbleSlice(), // 세션4 저장 자리
+    training10k: { session3: {}, session4: {} }, // 10K 훈련 프로그램 체크리스트 (세션별로 분리, day index -> boolean)
+    trainingHalf: { session3: {}, session4: {} }, // 하프 마라톤 훈련 프로그램 체크리스트
+    trainingFull: { session3: {}, session4: {} }, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
+    trainingFullRecord: { session3: {}, session4: {} }, // 풀코스 기록반 훈련 프로그램 체크리스트
     privacyConsentAt: Date.now(), // 개인정보 수집·이용 동의 시점 (닉네임 설정 화면에서 체크 후에만 이 함수가 호출됨)
     createdAt: Date.now(),
   };
@@ -690,13 +709,14 @@ async function cloudCreateInitial(st){
 }
 
 // score/특정 미션 레벨(levels.미션id)처럼 '더하기'로만 안전하게 반영해야 하는 값들을 increment로 보낸다.
+// currentSession 기준 경로로 반영한다 (예: 'session3.bonusRolls').
 async function cloudIncrement(fields){
   if(!window.__fb || !state || !currentUser) return;
   const ref = cloudDocRef();
   if(!ref) return;
   const buildUpdateObj = ()=>{
     const obj = { updatedAt: window.__fb.serverTimestamp() };
-    Object.entries(fields).forEach(([k,v])=>{ obj[k] = window.__fb.increment(v); });
+    Object.entries(fields).forEach(([k,v])=>{ obj[`${currentSession}.${k}`] = window.__fb.increment(v); });
     return obj;
   };
   try{
@@ -705,16 +725,15 @@ async function cloudIncrement(fields){
     // 문서가 아직 없으면 updateDoc이 실패한다. 이때 절대로 score/levels를 '통짜 값'으로 다시 쓰면 안 된다
     // (가입 직후 빠르게 여러 미션을 연달아 완료하면, 이 복구 시도끼리 순서가 꼬여서
     //  나중에 완료한 게 먼저 완료한 것보다 더 늦게 저장되며 서로 덮어써버리는 사고가 날 수 있다).
-    // 그래서 score/levels는 아예 건드리지 않는 '뼈대'만 먼저 만들고, 원래 하려던 increment를 다시 시도한다.
+    // 그래서 세션별 진행 데이터는 아예 건드리지 않는 '뼈대'만 먼저 만들고, 원래 하려던 increment를 다시 시도한다.
     try{
-      const { score, levels, bonusRolls, ...rest } = state;
-      await window.__fb.setDoc(ref, { ...rest, uid: currentUser.uid, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+      await window.__fb.setDoc(ref, buildSafeRestPayload(), { merge:true });
       await window.__fb.updateDoc(ref, buildUpdateObj());
     }catch(e2){ console.warn('cloud 증분 재시도 실패:', e2); }
   }
 }
 
-// 말의 위치(position)는 다른 값들과 달리 디바운스 없이 '즉시' 저장한다.
+// 말의 위치(position)는 다른 값들과 달리 디바운스 없이 '즉시' 저장한다. currentSession 기준 경로로 반영한다.
 // (도착하자마자 뒤로가기를 누르거나 앱을 나가는 경우가 흔해서, 몇 초라도 미루면
 //  자주 유실되는 값이라 — 위치가 확정되는 그 순간 바로 클라우드에 반영한다)
 async function cloudSyncPositionNow(){
@@ -722,18 +741,34 @@ async function cloudSyncPositionNow(){
   try{
     const ref = cloudDocRef();
     if(!ref) return;
-    // arrivalId/completionUsed도 위치와 함께 즉시 반영해야, 다른 탭이 "이번 도착은 아직 완료 전"임을
-    // 곧바로 알 수 있다 (미션 완료 자체는 별도 트랜잭션이 최종 방어선이라 여기선 최신 상태 공유가 목적).
+    // arrivalId/completionUsed/dailyRolls/pendingPenalty도 위치와 함께 즉시 반영해야, 다른 탭이
+    // "이번 도착은 아직 완료 전"임을 곧바로 알 수 있다 (미션 완료 자체는 별도 트랜잭션이 최종 방어선).
+    const p = currentSession + '.';
     await window.__fb.setDoc(ref, {
-      position: state.position,
-      arrivalId: state.arrivalId,
-      completionUsed: state.completionUsed,
+      [p+'position']: state.position,
+      [p+'arrivalId']: state.arrivalId,
+      [p+'completionUsed']: state.completionUsed,
+      [p+'dailyRolls']: state.dailyRolls,
+      [p+'pendingPenalty']: state.pendingPenalty,
       updatedAt: window.__fb.serverTimestamp(),
     }, { merge:true });
   }catch(e){ console.warn('cloud 위치 저장 실패:', e); }
 }
 
-// score/levels를 제외한 나머지 필드(위치, 체크리스트 등)는 저장이 발생하는 즉시 클라우드에 반영한다.
+// scheduleCloudSync()가 통짜로 써도 안전한 필드만 골라낸다 (계정 정보 + 훈련 체크리스트).
+// 세션별 진행 데이터(position/levels/score/bonusRolls/dailyRolls/pendingPenalty/completionUsed/
+// arrivalId/completionLog)는 전부 제외한다 — 그건 cloudSyncPositionNow/cloudIncrement/완료 트랜잭션
+// 같은 전용 경로로만 currentSession 기준으로 반영해야, 다른 탭/세션 값이 실수로 덮어써지지 않는다.
+function buildSafeRestPayload(){
+  const {
+    score, levels, bonusRolls, position, dailyRolls, pendingPenalty,
+    completionUsed, arrivalId, completionLog, session3, session4,
+    ...rest
+  } = state;
+  return { ...rest, uid: currentUser.uid, updatedAt: window.__fb.serverTimestamp() };
+}
+
+// score/levels를 제외한 나머지 필드(계정 정보, 훈련 체크리스트 등)는 저장이 발생하는 즉시 클라우드에 반영한다.
 // (디바운스 없이 매번 바로 쓰기 때문에, 몇 초 안에 여러 번 호출돼도 매번 Firestore 쓰기가 발생할 수 있다 —
 //  다만 참가자 규모상 free-tier 쓰기 한도 내로 충분히 안전하다고 판단해 즉시 저장으로 전환했다)
 function scheduleCloudSync(){
@@ -742,12 +777,7 @@ function scheduleCloudSync(){
     try{
       const ref = cloudDocRef();
       if(!ref) return;
-      // score/levels/bonusRolls는 increment 전용이라 통짜 덮어쓰기에서 제외.
-      // position도 여기서 빼야 한다 — 위치는 오직 cloudSyncPositionNow()만 책임지는 전용 경로로 관리한다.
-      // (여기서 같이 써버리면, 다른 탭이 방금 정확히 저장해둔 최신 위치를, 이 탭이 갖고 있던
-      //  오래된 위치 값으로 다시 덮어써버리는 사고가 난다 — 실제로 있었던 버그다)
-      const { score, levels, bonusRolls, position, ...rest } = state;
-      await window.__fb.setDoc(ref, { ...rest, uid: currentUser.uid, updatedAt: window.__fb.serverTimestamp() }, { merge:true });
+      await window.__fb.setDoc(ref, buildSafeRestPayload(), { merge:true });
     }catch(e){ console.warn('cloud 동기화 실패:', e); }
   })();
 }
@@ -879,6 +909,7 @@ const app = document.getElementById('app');
 let currentView = 'hub'; // 'hub' | 'marble' | 'wip'
 let wipTitle = '';
 let currentUser = null; // Firebase Auth로 로그인된 사용자 (없으면 null)
+let currentSession = 'session3'; // 'session3' | 'session4' — 지금 보고 있는 세션 탭 (새로고침하면 항상 세션3으로 시작)
 
 function render(){
   if(!state){
@@ -896,6 +927,64 @@ function render(){
 function goToHub(){
   currentView = 'hub';
   render();
+}
+
+// 세션별 러닝마블 주사위 활성 기간, 그리고 세션4 탭 자체가 열리는 날짜.
+const SESSION_DICE_DATES = {
+  session3: { start: '2026-08-30', end: '2026-09-12' }, // 9/13 00:00부터 비활성
+  session4: { start: '2026-09-13', end: '2026-09-30' }, // 10/1 00:00부터 비활성
+};
+const SESSION4_REVEAL_DATE = '2026-09-10'; // 세션4 탭 자체(러닝마블판·훈련 일정)가 열리는 날짜
+
+function isSession4Revealed(){
+  return getTodayStr() >= SESSION4_REVEAL_DATE;
+}
+// 지금 currentSession 기준으로, 오늘 날짜가 그 세션의 주사위 활성 기간 안에 있는지.
+function isDiceActiveForCurrentSession(){
+  const range = SESSION_DICE_DATES[currentSession];
+  if(!range) return false;
+  const today = getTodayStr();
+  return today >= range.start && today <= range.end;
+}
+
+// 세션3 ↔ 세션4 탭을 전환한다. 훈련표 체크는 언제든 가능하지만(날짜 제한 없음),
+// 러닝마블 주사위는 화면을 그릴 때 isDiceActiveForCurrentSession()으로 별도 잠금 처리된다.
+function switchToSession(newSession){
+  if(!state || newSession === currentSession) return;
+  if(newSession === 'session4' && !isSession4Revealed()){
+    showToast(`🔒 세션4는 ${formatShortDate(SESSION4_REVEAL_DATE)}에 열립니다`);
+    return;
+  }
+  // 지금까지 보고 있던 세션의 작업 사본을 그 세션 저장 자리에도 남겨둔다 (로컬 일관성용 — 실제
+  // 클라우드 반영은 이미 즉시 저장 방식이라 매 행동마다 currentSession 경로로 계속 반영되어 있었다).
+  state[currentSession] = {
+    position: state.position, levels: state.levels, score: state.score,
+    dailyRolls: state.dailyRolls, bonusRolls: state.bonusRolls,
+    pendingPenalty: state.pendingPenalty, completionUsed: state.completionUsed,
+    arrivalId: state.arrivalId, completionLog: state.completionLog,
+  };
+  currentSession = newSession;
+  const slice = state[newSession] || freshMarbleSlice();
+  state.position = slice.position;
+  state.levels = slice.levels;
+  state.score = slice.score;
+  state.dailyRolls = slice.dailyRolls;
+  state.bonusRolls = slice.bonusRolls;
+  state.pendingPenalty = slice.pendingPenalty;
+  state.completionUsed = slice.completionUsed;
+  state.arrivalId = slice.arrivalId;
+  state.completionLog = slice.completionLog;
+  MISSIONS = newSession === 'session3' ? MISSIONS_SESSION3 : MISSIONS_SESSION4;
+  TRAINING_PROGRAMS = newSession === 'session3' ? TRAINING_PROGRAMS_SESSION3 : TRAINING_PROGRAMS_SESSION4;
+  currentView = 'hub';
+  render();
+}
+
+// 'YYYY-MM-DD' → 'M/D' 짧은 표시용 포맷
+function formatShortDate(dateStr){
+  const parts = String(dateStr || '').split('-');
+  if(parts.length !== 3) return dateStr || '';
+  return `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}`;
 }
 
 // Firebase 인증 에러 코드를 참가자용 한국어 안내문으로 변환한다.
@@ -1174,8 +1263,39 @@ async function proceedAfterAuth(user){
 
 // 앱 부팅: Firebase가 준비될 때까지 기다렸다가, 로그인 상태 변화를 구독해서
 // 화면을 결정한다 (로그인 안 됨 → 로그인 화면 / 인증 대기 / 닉네임 설정 / 허브).
+// 배포할 때마다 이 문자열과 version.txt 파일 내용을 같이 바꿔주면, 이미 켜져있는 탭들이
+// 몇십 초 안에 자동으로 알아채고 "새 버전 있음" 배너를 띄운다 (참가자가 직접 새로고침 안 해도 됨).
+const APP_VERSION = '2026-08-30-1';
+
+function showUpdateBanner(){
+  if(document.getElementById('update-banner')) return; // 이미 떠있으면 중복 생성 안 함
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--sunset-1);color:#fff;padding:12px 16px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25);';
+  banner.textContent = '🆕 새 버전이 있어요 · 눌러서 새로고침';
+  banner.addEventListener('click', ()=> window.location.reload());
+  document.body.appendChild(banner);
+}
+
+async function checkForNewVersion(){
+  try{
+    const res = await fetch('./version.txt?t=' + Date.now(), { cache: 'no-store' });
+    if(!res.ok) return;
+    const remoteVersion = (await res.text()).trim();
+    if(remoteVersion && remoteVersion !== APP_VERSION){
+      showUpdateBanner();
+    }
+  }catch(e){ /* 네트워크 문제 등은 조용히 무시하고 다음 주기에 다시 시도한다 */ }
+}
+
+function startVersionCheckLoop(){
+  checkForNewVersion(); // 부팅 직후 한 번
+  setInterval(checkForNewVersion, 60000); // 이후 1분마다 계속 확인
+}
+
 function bootApp(){
   app.innerHTML = `<div class="fade-in flex items-center justify-center" style="min-height:80vh;"><p class="text-sm" style="color:var(--text-dim)">불러오는 중...</p></div>`;
+  startVersionCheckLoop(); // 새 버전 배포 감지는 로그인 여부와 상관없이 항상 돌아가야 한다
   waitForFirebaseReady(8000).then((ready)=>{
     if(!ready || !window.__fb){
       app.innerHTML = `<div class="fade-in flex flex-col items-center justify-center text-center px-6" style="min-height:80vh;"><p class="text-sm" style="color:var(--text-dim)">네트워크 연결을 확인하고 새로고침 해주세요.</p></div>`;
@@ -1235,14 +1355,27 @@ function openGoalEditModal(){
    허브 화면 (마라닉프렌즈 9기 메인) — 닉네임/목표 + 2x2 프로그램 카드
    ========================================================= */
 function renderHub(){
+  const sessionLabel = currentSession === 'session3' ? '세션3' : '세션4';
+  const session4Locked = !isSession4Revealed();
   app.innerHTML = `
     <div class="fade-in">
       <div class="mb-4 flex justify-center">${miniLogoHtml()}</div>
-      <div class="text-center mt-2 mb-8">
-        <p class="text-xl font-semibold tracking-wide uppercase" style="color:var(--text)">마라닉프렌즈 9기 세션3</p>
+      <div class="text-center mt-2 mb-6">
+        <p class="text-xl font-semibold tracking-wide uppercase" style="color:var(--text)">마라닉프렌즈 9기 ${sessionLabel}</p>
         <h1 class="font-display text-2xl font-bold mt-1">
           <span class="sunset-text">${escapeHtml(state.nickname)}</span>님
         </h1>
+      </div>
+
+      <div class="flex gap-2 mb-8 rounded-xl p-1" style="background:var(--bg-elev-2); border:1px solid var(--line);">
+        <button type="button" id="session-tab-session3" class="flex-1 py-2 rounded-lg text-sm font-bold"
+          style="${currentSession==='session3' ? 'background:var(--sunset-1); color:#fff;' : 'background:transparent; color:var(--text-dim);'}">
+          세션3
+        </button>
+        <button type="button" id="session-tab-session4" class="flex-1 py-2 rounded-lg text-sm font-bold"
+          style="${currentSession==='session4' ? 'background:var(--sunset-1); color:#fff;' : 'background:transparent; color:var(--text-dim);'} ${session4Locked ? 'opacity:.6;' : ''}">
+          세션4 ${session4Locked ? '🔒' : ''}
+        </button>
       </div>
 
       <button id="goal-edit-btn" type="button" class="w-full text-left rounded-2xl p-4 mb-8" style="background:var(--bg-elev); border:1px solid var(--line);">
@@ -1253,6 +1386,13 @@ function renderHub(){
         <p class="font-medium mt-1 truncate" style="color:var(--text)">${state.goal ? escapeHtml(state.goal) : '아직 목표를 정하지 않았어요'}</p>
       </button>
 
+      ${(currentSession === 'session4' && session4Locked) ? `
+        <div class="rounded-2xl p-8 text-center" style="background:var(--bg-elev); border:1px solid var(--line);">
+          <div class="text-4xl mb-3">🔒</div>
+          <p class="font-display font-bold text-lg">세션4는 ${formatShortDate(SESSION4_REVEAL_DATE)}에 열립니다</p>
+          <p class="text-xs mt-2" style="color:var(--text-dim)">그 전까지는 세션3 탭에서 계속 진행해주세요</p>
+        </div>
+      ` : `
       <div class="grid grid-cols-2 gap-4">
         <button type="button" class="hub-card" data-target="trainingFull" data-title="풀코스 마라톤 완주반">
           <span class="hub-card-emoji">🏁</span>
@@ -1283,6 +1423,7 @@ function renderHub(){
           <span class="hub-card-desc">완료할수록 우수 마프 확률 UP!!</span>
         </span>
       </button>
+      `}
 
       <div class="mt-10 flex justify-center">
         <button id="reset-btn-bottom" class="text-xs px-4 py-2 rounded-full"
@@ -1295,6 +1436,8 @@ function renderHub(){
 
   document.getElementById('goal-edit-btn').addEventListener('click', openGoalEditModal);
   document.getElementById('reset-btn-bottom').addEventListener('click', confirmReset);
+  document.getElementById('session-tab-session3').addEventListener('click', ()=> switchToSession('session3'));
+  document.getElementById('session-tab-session4').addEventListener('click', ()=> switchToSession('session4'));
   document.querySelectorAll('.hub-card').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if(btn.dataset.target === 'marble'){
@@ -1338,7 +1481,7 @@ function renderWorkInProgress(){
 function renderTrainingProgram(programKey){
   const program = TRAINING_PROGRAMS[programKey];
   const days = program.data;
-  const checks = state[programKey];
+  const checks = state[programKey][currentSession] || (state[programKey][currentSession] = {});
   const doneCount = days.filter((_,i)=> !!checks[i]).length;
   const weeks = [5, 6];
 
@@ -1507,7 +1650,7 @@ function openMarbleHistoryModal(){
 function openTrainingDayInfo(programKey, i){
   const program = TRAINING_PROGRAMS[programKey];
   const day = program.data[i];
-  const done = !!state[programKey][i];
+  const done = !!(state[programKey][currentSession] && state[programKey][currentSession][i]);
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.innerHTML = `
@@ -1537,7 +1680,8 @@ function openTrainingDayInfo(programKey, i){
   backdrop.querySelector('#modal-close').addEventListener('click', close);
   backdrop.querySelector('#modal-confirm').addEventListener('click', close);
   backdrop.querySelector('#training-toggle-btn').addEventListener('click', ()=>{
-    state[programKey][i] = !state[programKey][i];
+    if(!state[programKey][currentSession]) state[programKey][currentSession] = {};
+    state[programKey][currentSession][i] = !state[programKey][currentSession][i];
     saveState(state);
     close();
     renderTrainingProgram(programKey);
@@ -1556,7 +1700,10 @@ function renderGame(){
   const rollsLeft = getRollsLeft();
   const bonusRolls = state.bonusRolls || 0;
   const canStillRoll = rollsLeft > 0 || bonusRolls > 0;
-  const notStartedYet = false; // 테스트 모드이므로 시작일 제한을 해제해뒀어요 (실 운영 전 CAMPAIGN_START_DATE 로직 복원 필요)
+  const diceActive = isDiceActiveForCurrentSession();
+  const notStartedYet = !diceActive; // 세션별 주사위 활성 기간(예: 세션3 8/30~9/12) 밖이면 잠금
+  const dateRange = SESSION_DICE_DATES[currentSession];
+  const sessionLabel = currentSession === 'session3' ? '세션3' : '세션4';
 
   app.innerHTML = `
     <div class="fade-in">
@@ -1568,7 +1715,7 @@ function renderGame(){
           style="background:var(--bg-elev); border:1px solid var(--line); color:var(--text-dim);">⟳</button>
       </div>
       <h1 id="dashboard-title" class="font-display text-lg font-bold text-center mb-8" style="user-select:none;">
-        <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:var(--text-dim); font-size:0.7em;">세션3</span>
+        <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:var(--text-dim); font-size:0.7em;">${sessionLabel}</span>
       </h1>
 
       <div class="flex gap-2 mb-4">
@@ -1611,11 +1758,11 @@ function renderGame(){
             </button>
             <p class="text-xs" style="color:var(--text-dim)">🔓 관리자 모드 · 무제한</p>
           ` : notStartedYet ? `
-            <div class="text-3xl">🗓️</div>
+            <div class="text-3xl">🔒</div>
             <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm" disabled style="opacity:.4; cursor:not-allowed;">
               주사위 던지기
             </button>
-            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">세션3 러닝마블은 8월 30일부터<br>시작할 수 있어요</p>
+            <p class="text-xs text-center leading-relaxed" style="color:var(--text-dim)">${sessionLabel} 러닝마블 기간이 아니에요<br>(${formatShortDate(dateRange.start)}~${formatShortDate(dateRange.end)}에 주사위를 굴릴 수 있어요)</p>
           ` : allMastered ? `
             <div class="text-3xl">🏆</div>
             <p class="font-display font-bold text-sm text-center px-4" style="color:var(--complete)">모든 미션 마스터!</p>
@@ -1748,15 +1895,13 @@ function markRollingDone(){
 }
 
 function getValidRolls(){
-  // 주사위 2개를 굴려서 합(2~12)만큼 이동한다. "라운드" 개념으로 강하게 막는다:
-  // 지금 보드 전체에서 아직 마스터 안 된 미션들 중 가장 낮은 완료 횟수를 '이번 라운드'로 보고,
-  // 그 라운드를 아직 안 채운 미션 칸으로만 가게 만든다 (다른 칸은 확률 0).
-  // → 모든 미션이 1회를 채워야 2회차 미션 칸들이 열리고, 2회차가 다 채워져야 3회차가 열리는 식.
-  const W_CURRENT_ROUND = 8; // 이번 라운드에서 아직 안 한 미션 칸 (사실상 유일하게 갈 수 있는 대상)
-  const W_START         = 2; // START
-
-  const unmastered = MISSION_INDICES.filter(i => getLevel(i) < MAX_LEVEL);
-  const minLevel = unmastered.length > 0 ? Math.min(...unmastered.map(i => getLevel(i))) : 0;
+  // 주사위 2개를 굴려서 합(2~12)만큼 이동한다. "라운드"로 딱 자르지 않고, 완료 횟수가
+  // 늘수록 확률만 계단식으로 낮춘다 (0회는 훨씬 잘 나오지만, 이미 한 칸도 완전히 0%는 아니라서
+  // "저기밖에 갈 데가 없네" 하는 예측 가능한 느낌이 덜하다).
+  const W_LEVEL0 = 8; // 아직 한 번도 안 한 미션 칸
+  const W_LEVEL1 = 1; // 1회 완료한 미션 칸
+  const W_LEVEL2 = 1; // 2회 완료한 미션 칸
+  const W_START  = 1; // START (미션이 아니라 다른 칸으로 가기 위한 중간 다리일 뿐이라 낮게 유지)
 
   const pool = [];
   for(let r=2;r<=12;r++){
@@ -1767,25 +1912,11 @@ function getValidRolls(){
     } else {
       const lvl = getLevel(target);
       if(lvl >= MAX_LEVEL) continue; // 마스터된 칸은 이동 대상에서 제외
-      if(lvl === minLevel) weight = W_CURRENT_ROUND; // 이번 라운드에서 아직 안 한 미션만 대상 (그 외엔 0으로 배제)
+      weight = lvl === 0 ? W_LEVEL0 : lvl === 1 ? W_LEVEL1 : W_LEVEL2;
     }
     for(let k=0;k<weight;k++) pool.push(r);
   }
   if(pool.length > 0) return pool;
-  // 안전장치: 2~12칸 범위 안에 '이번 라운드' 대상이 하나도 없는 드문 경우, 라운드 제한을 풀고 다시 시도한다
-  // (마스터 전인 칸이라면 라운드 상관없이 허용 — 주사위가 아예 안 나오는 상황만은 막는다).
-  const relaxedPool = [];
-  for(let r=2;r<=12;r++){
-    const target = (state.position + r) % TOTAL_CELLS;
-    if(target === 0){
-      for(let k=0;k<W_START;k++) relaxedPool.push(r);
-      continue;
-    }
-    const lvl = getLevel(target);
-    if(lvl >= MAX_LEVEL) continue;
-    for(let k=0;k<W_CURRENT_ROUND;k++) relaxedPool.push(r);
-  }
-  if(relaxedPool.length > 0) return relaxedPool;
   // 모든 칸이 마스터된 극단적인 경우를 대비한 안전장치 (2~12 균등)
   const fallback = [];
   for(let r=2;r<=12;r++) fallback.push(r);
@@ -1793,14 +1924,51 @@ function getValidRolls(){
 }
 
 // 주사위 2개의 눈이 정확히 sum이 되는 조합 하나를 무작위로 고른다 (화면에 보여줄 개별 눈 값용).
-function pickDicePairForSum(sum){
-  const pairs = [];
+// 더블(같은 눈)이 나올 확률을 이 값으로 고정한다 (진짜 주사위 두 개랑 같은 확률 = 1/6).
+const DOUBLE_PROBABILITY = 1/6;
+
+// '더블로 할지'를 먼저 정하고, 그 결정에 맞는 합계만 후보 풀에서 추려낸 다음 뽑는다.
+// (합계부터 뽑고 나중에 더블 여부를 끼워맞추려 하면, 2·12는 항상 무조건 더블이라는 사실 때문에
+//  실제 더블 확률이 목표치보다 훨씬 높게(약 24~28%) 나온다 — 그래서 순서를 반대로 한다)
+// pool: getValidRolls()가 만든 가중치 풀(합계가 여러 번 들어있는 배열). 반환값은 { result, pair }.
+function rollDicePair(pool){
+  const wantDouble = Math.random() < DOUBLE_PROBABILITY;
+  const doubleCapable = pool.filter(s => s % 2 === 0); // 더블이 될 수 있는(짝수) 합계만
+  const nonForced = pool.filter(s => s !== 2 && s !== 12); // 무조건 더블은 아닌(2·12가 아닌) 합계만
+
+  let result;
+  if(wantDouble && doubleCapable.length > 0){
+    result = doubleCapable[Math.floor(Math.random()*doubleCapable.length)];
+  } else if(!wantDouble && nonForced.length > 0){
+    result = nonForced[Math.floor(Math.random()*nonForced.length)];
+  } else {
+    // 극단적인 예외: 후보 풀에 딱 맞는 합계가 하나도 없는 경우 (거의 안 일어남) — 그냥 풀 전체에서 뽑는다
+    result = pool[Math.floor(Math.random()*pool.length)];
+  }
+  const pair = pickDicePairForSum(result, wantDouble);
+  return { result, pair };
+}
+
+function pickDicePairForSum(sum, wantDouble){
+  const allPairs = [];
   for(let a=1;a<=6;a++){
     const b = sum - a;
-    if(b>=1 && b<=6) pairs.push([a,b]);
+    if(b>=1 && b<=6) allPairs.push([a,b]);
   }
-  if(pairs.length === 0) return [1,1]; // 이론상 2~12 범위에서는 항상 조합이 있어서 안 쓰이는 안전장치
-  return pairs[Math.floor(Math.random()*pairs.length)];
+  if(allPairs.length === 0) return [1,1]; // 이론상 2~12 범위에서는 항상 조합이 있어서 안 쓰이는 안전장치
+
+  const doublePairs = allPairs.filter(([a,b]) => a === b);
+  const nonDoublePairs = allPairs.filter(([a,b]) => a !== b);
+
+  if(wantDouble && doublePairs.length > 0){
+    return doublePairs[0]; // 합계가 짝수라 더블 조합이 있으면 그걸 사용
+  }
+  if(!wantDouble && nonDoublePairs.length > 0){
+    return nonDoublePairs[Math.floor(Math.random()*nonDoublePairs.length)]; // 더블이 아닌 조합 중 하나
+  }
+  // wantDouble인데 합계가 홀수라 더블 조합이 없는 경우 → 이번 판은 어쩔 수 없이 더블 없이 진행
+  // wantDouble이 아닌데 합계가 2/12라 더블 조합밖에 없는 경우 → 어쩔 수 없이 더블로 진행
+  return allPairs[Math.floor(Math.random()*allPairs.length)];
 }
 
 // 지금 말이 서 있는 칸이 '아직 완료 안 한 실제 미션'인지 확인한다.
@@ -1873,15 +2041,16 @@ async function syncRollAvailabilityFromCloud(){
     const snap = await window.__fb.getDoc(ref);
     if(!snap.exists()) return;
     const cloudData = snap.data();
-    if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
-      const cloudCount = cloudData.dailyRolls.count || 0;
+    const activeCloud = cloudData[currentSession] || {};
+    if(activeCloud.dailyRolls && activeCloud.dailyRolls.date === getTodayStr()){
+      const cloudCount = activeCloud.dailyRolls.count || 0;
       const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
       if(cloudCount > localCount){
         state.dailyRolls = { date: getTodayStr(), count: cloudCount };
       }
     }
-    if(typeof cloudData.bonusRolls === 'number'){
-      state.bonusRolls = cloudData.bonusRolls; // increment 전용이라 클라우드 값이 항상 정확함
+    if(typeof activeCloud.bonusRolls === 'number'){
+      state.bonusRolls = activeCloud.bonusRolls; // increment 전용이라 클라우드 값이 항상 정확함
     }
     saveState(state);
   }catch(e){ console.warn('주사위 가능 횟수 확인 실패:', e); }
@@ -1889,7 +2058,13 @@ async function syncRollAvailabilityFromCloud(){
 
 async function onRoll(){
   if(isRolling) return;
-  // 테스트 모드이므로 시작일 제한(CAMPAIGN_START_DATE) 체크는 비활성화해뒀어요.
+  // 세션별 주사위 활성 기간(관리자 모드는 예외) — 버튼 자체는 renderGame()에서 이미 비활성화되지만,
+  // 혹시 모를 우회(개발자도구 등)를 막기 위해 실제로 굴리는 함수 안에서도 한 번 더 확인한다.
+  if(!state.adminMode && !isDiceActiveForCurrentSession()){
+    const range = SESSION_DICE_DATES[currentSession];
+    showToast(`🔒 러닝마블 기간이 아니에요 (${formatShortDate(range.start)}~${formatShortDate(range.end)})`);
+    return;
+  }
 
   isRolling = true; // 아래 클라우드 확인하는 동안에도 중복 클릭 막기
   setBackButtonLocked(true); // 주사위 굴리는 동안엔 뒤로가기로 못 나가게 막는다 (애니메이션 중간에 나가면 위치 저장이 안 될 수 있음)
@@ -1932,8 +2107,8 @@ async function onRoll(){
     clearInterval(spinInterval);
     die1.classList.remove('rolling');
     if(die2) die2.classList.remove('rolling');
-    const result = validRolls[Math.floor(Math.random()*validRolls.length)]; // 주사위 2개의 합 (2~12)
-    const [d1, d2] = pickDicePairForSum(result); // 화면에 보여줄 개별 눈 값 하나를 무작위로 선택
+    const { result, pair } = rollDicePair(validRolls); // 합계(2~12)와 화면에 보여줄 개별 눈 값을 함께 결정
+    const [d1, d2] = pair;
     renderDicePair(d1, d2);
     if(d1 === d2){
       // 더블(같은 눈)이 나오면 보너스 주사위 1회 추가.
@@ -2142,10 +2317,11 @@ function openMission(index){
           const snap = await tx.get(ref);
           if(!snap.exists()) return { already:true };
           const data = snap.data();
-          if(data.completedArrivalId === arrivalId){
+          const sessionData = data[currentSession] || {};
+          if(sessionData.completedArrivalId === arrivalId){
             return { already:true }; // 이미 이 도착에 대해 다른 탭/기기가 완료 처리를 끝냄
           }
-          const currentLevel = (data.levels && data.levels[missionId]) || 0;
+          const currentLevel = (sessionData.levels && sessionData.levels[missionId]) || 0;
           if(currentLevel >= MAX_LEVEL){
             return { already:true }; // 그 사이 이미 마스터 단계까지 도달함
           }
@@ -2153,12 +2329,13 @@ function openMission(index){
 
           // '나의 러닝마블 내역'에서 시간순으로 보여주기 위한 완료 이력 한 줄 추가.
           // (문서 하나에 계속 쌓이는 배열이라, 혹시 모를 과도한 증가를 대비해 최근 300개까지만 유지한다)
-          const prevLog = Array.isArray(data.completionLog) ? data.completionLog : [];
+          const prevLog = Array.isArray(sessionData.completionLog) ? sessionData.completionLog : [];
           const newLog = [...prevLog, { date: getTodayStr(), title: mission.title }].slice(-300);
+          const p = currentSession + '.';
           tx.update(ref, {
-            ['levels.' + missionId]: newLevel,
-            completedArrivalId: arrivalId,
-            completionLog: newLog,
+            [p + 'levels.' + missionId]: newLevel,
+            [p + 'completedArrivalId']: arrivalId,
+            [p + 'completionLog']: newLog,
             updatedAt: window.__fb.serverTimestamp(),
           });
           return { already:false, newLevel, newLog };
@@ -2268,7 +2445,9 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
   let changed = false;
   let progressAheadOnCloud = false; // 클라우드가 미션 기록 면에서 이 기기보다 실제로 앞서있는지
 
-  const cloudLevels = (cloudData.levels && typeof cloudData.levels === 'object') ? cloudData.levels : {};
+  const activeCloud = cloudData[currentSession] || {};
+
+  const cloudLevels = (activeCloud.levels && typeof activeCloud.levels === 'object') ? activeCloud.levels : {};
   Object.keys(cloudLevels).forEach(missionId=>{
     const cloudVal = cloudLevels[missionId] || 0;
     const localVal = (state.levels && state.levels[missionId]) || 0;
@@ -2281,8 +2460,8 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
   });
 
   // 완료 이력('나의 러닝마블 내역')도, 클라우드 쪽 기록이 더 길면(=다른 탭에서 완료가 더 있었으면) 그걸로 맞춘다.
-  if(Array.isArray(cloudData.completionLog) && cloudData.completionLog.length > (state.completionLog || []).length){
-    state.completionLog = cloudData.completionLog;
+  if(Array.isArray(activeCloud.completionLog) && activeCloud.completionLog.length > (state.completionLog || []).length){
+    state.completionLog = activeCloud.completionLog;
     changed = true;
   }
 
@@ -2291,46 +2470,30 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
   // 아직 클라우드에 반영이 안 된 시점에 새로고침했을 때 오히려 방금 굴린 위치가
   // 예전(출발지) 위치로 잘못 되돌아가는 사고가 난다 — 그걸 막기 위한 조건이다.
   // 진짜로 다른 기기에서 더 진행된 경우엔 점수/기록이 이미 앞서있을 것이므로 안전하다.)
-  if((trustPosition || progressAheadOnCloud) && typeof cloudData.position === 'number' && cloudData.position !== state.position){
-    state.position = cloudData.position;
+  if((trustPosition || progressAheadOnCloud) && typeof activeCloud.position === 'number' && activeCloud.position !== state.position){
+    state.position = activeCloud.position;
     changed = true;
   }
   // 위치를 믿고 따라가는 상황(trustPosition)이라면, 그 위치에 딸린 도착 식별자(arrivalId)와
   // 완료 여부(completionUsed)도 같이 맞춰준다 — 안 그러면 이 탭이 옛 arrivalId를 들고 있다가
   // 미션 완료 트랜잭션에서 엉뚱한 값으로 비교하게 된다.
-  if(trustPosition && typeof cloudData.arrivalId === 'string' && cloudData.arrivalId !== state.arrivalId){
-    state.arrivalId = cloudData.arrivalId;
-    state.completionUsed = !!cloudData.completionUsed;
+  if(trustPosition && typeof activeCloud.arrivalId === 'string' && activeCloud.arrivalId !== state.arrivalId){
+    state.arrivalId = activeCloud.arrivalId;
+    state.completionUsed = !!activeCloud.completionUsed;
     changed = true;
   }
   // 같은 도착(arrivalId)에 대해 다른 탭이 이미 미션 완료를 끝냈다면, 이 탭도 "완료됨"으로 맞춘다.
   // (완료 자체는 트랜잭션이 막아주지만, 버튼을 계속 눌러볼 수 있는 상태로 두면 UX상 혼란스러우니
   //  실시간으로 알게 되는 즉시 버튼을 비활성 상태로 갱신해준다)
-  if(cloudData.completedArrivalId && cloudData.completedArrivalId === state.arrivalId && !state.completionUsed){
+  if(activeCloud.completedArrivalId && activeCloud.completedArrivalId === state.arrivalId && !state.completionUsed){
     state.completionUsed = true;
     changed = true;
   }
 
-  // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 "OR 병합"한다.
-  // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
-  // (체크는 기본적으로 한 방향으로만 진행되는 동작이라, 둘 중 하나라도 체크했으면
-  // 안 지워지게 유지하는 게 안전하다 — 다른 기기에서 체크한 걸 이 기기가 다시 저장할 때
-  // 실수로 덮어써서 지워버리는 사고를 막아준다)
-  ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
-    const cloudChecks = (cloudData[key] && typeof cloudData[key] === 'object') ? cloudData[key] : {};
-    if(!state[key]) state[key] = {};
-    Object.keys(cloudChecks).forEach(dayIdx=>{
-      if(cloudChecks[dayIdx] && !state[key][dayIdx]){
-        state[key][dayIdx] = true;
-        changed = true;
-      }
-    });
-  });
-
   // 오늘 주사위를 이미 몇 번 썼는지는, 다른 기기가 이미 더 많이 썼다면 그 값을 따라간다.
   // (이걸 안 맞추면 한쪽 기기가 "하루 1회 제한"을 모르고 또 굴릴 수 있음)
-  if(cloudData.dailyRolls && cloudData.dailyRolls.date === getTodayStr()){
-    const cloudCount = cloudData.dailyRolls.count || 0;
+  if(activeCloud.dailyRolls && activeCloud.dailyRolls.date === getTodayStr()){
+    const cloudCount = activeCloud.dailyRolls.count || 0;
     const localCount = (state.dailyRolls && state.dailyRolls.date === getTodayStr()) ? (state.dailyRolls.count || 0) : 0;
     if(cloudCount > localCount){
       state.dailyRolls = { date: getTodayStr(), count: cloudCount };
@@ -2340,15 +2503,41 @@ function applyCloudReconciliation(cloudData, { trustPosition = false } = {}){
 
   // 보너스 찬스는 이제 클라우드에서 오직 더하기/빼기(increment)로만 바뀌기 때문에,
   // 클라우드 값이 항상 정확하다. 그래서 '더 큰 값'이 아니라 클라우드 값을 그대로 따라간다.
-  if(typeof cloudData.bonusRolls === 'number' && cloudData.bonusRolls !== (state.bonusRolls || 0)){
-    state.bonusRolls = cloudData.bonusRolls;
+  if(typeof activeCloud.bonusRolls === 'number' && activeCloud.bonusRolls !== (state.bonusRolls || 0)){
+    state.bonusRolls = activeCloud.bonusRolls;
     changed = true;
   }
   // 무인도 페널티 이월은 더 큰 값을 따라간다(안전한 쪽으로).
-  if(typeof cloudData.pendingPenalty === 'number' && cloudData.pendingPenalty > (state.pendingPenalty || 0)){
-    state.pendingPenalty = cloudData.pendingPenalty;
+  if(typeof activeCloud.pendingPenalty === 'number' && activeCloud.pendingPenalty > (state.pendingPenalty || 0)){
+    state.pendingPenalty = activeCloud.pendingPenalty;
     changed = true;
   }
+
+  // 지금 안 보고 있는 세션(비활성 세션)의 클라우드 데이터는, 편집 중인 게 아니므로 그대로 로컬 캐시에
+  // 반영해둔다 — 나중에 그 탭으로 전환할 때 굳이 새로 안 불러와도 되게 하기 위함.
+  const inactiveSession = currentSession === 'session3' ? 'session4' : 'session3';
+  if(cloudData[inactiveSession] && typeof cloudData[inactiveSession] === 'object'){
+    state[inactiveSession] = cloudData[inactiveSession];
+  }
+
+  // 훈련 프로그램 체크리스트(10K/하프/풀코스 완주반/풀코스 기록반)는 세션별로, "OR 병합"한다.
+  // 즉 이 기기든 다른 기기든 어느 한쪽이라도 체크했으면 체크된 걸로 본다.
+  // (체크는 기본적으로 한 방향으로만 진행되는 동작이라, 둘 중 하나라도 체크했으면
+  // 안 지워지게 유지하는 게 안전하다 — 다른 기기에서 체크한 걸 이 기기가 다시 저장할 때
+  // 실수로 덮어써서 지워버리는 사고를 막아준다)
+  ['training10k','trainingHalf','trainingFull','trainingFullRecord'].forEach(key=>{
+    ['session3','session4'].forEach(sess=>{
+      const cloudChecks = (cloudData[key] && cloudData[key][sess] && typeof cloudData[key][sess] === 'object') ? cloudData[key][sess] : {};
+      if(!state[key]) state[key] = { session3:{}, session4:{} };
+      if(!state[key][sess]) state[key][sess] = {};
+      Object.keys(cloudChecks).forEach(dayIdx=>{
+        if(cloudChecks[dayIdx] && !state[key][sess][dayIdx]){
+          state[key][sess][dayIdx] = true;
+          changed = true;
+        }
+      });
+    });
+  });
 
   return changed;
 }
