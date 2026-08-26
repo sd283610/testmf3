@@ -815,7 +815,30 @@ async function cloudFetchMyDoc(){
     if(!snap.exists()) return null;
     const data = snap.data();
     delete data.updatedAt;
-    return normalizeState(data);
+    // "session3/session4가 아예 없는" 경우뿐 아니라, "있긴 한데 필드가 빠진(예전에 검증 실패로
+    // 부분적으로만 저장된) 경우"까지 잡아내야 한다 — 안 그러면 위치 저장이 계속 조용히 실패해서
+    // 방금 이동한 위치가 클라우드에 반영이 안 되고, 실시간 동기화 때 옛날 값으로 되돌아가 보인다.
+    const isValidSlice = (slice)=> !!slice && typeof slice === 'object'
+      && typeof slice.position === 'number'
+      && typeof slice.score === 'number'
+      && typeof slice.bonusRolls === 'number'
+      && typeof slice.levels === 'object' && slice.levels !== null;
+    const needsRepair = !isValidSlice(data.session3) || !isValidSlice(data.session4);
+    const normalized = normalizeState(data);
+    if(needsRepair && normalized){
+      try{
+        await window.__fb.setDoc(ref, {
+          session3: normalized.session3,
+          session4: normalized.session4,
+          training10k: normalized.training10k,
+          trainingHalf: normalized.trainingHalf,
+          trainingFull: normalized.trainingFull,
+          trainingFullRecord: normalized.trainingFullRecord,
+          updatedAt: window.__fb.serverTimestamp(),
+        }, { merge:true });
+      }catch(e){ console.warn('세션 구조 복구 저장 실패:', e); }
+    }
+    return normalized;
   }catch(e){ console.warn('cloud 불러오기 실패:', e); return null; }
 }
 
