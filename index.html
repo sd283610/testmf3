@@ -562,7 +562,30 @@ const PROGRAM_GUIDES = {
 /* =========================================================
    상태
    ========================================================= */
+// URL에 ?testDate=2026-09-10 처럼 붙이면, 기기 시스템 시간을 안 건드리고도 "오늘"을 원하는 날짜로
+// 바꿔서 테스트할 수 있다. 참가자용 실제 링크에는 이 파라미터가 없으니 평소엔 100% 무시된다.
+// (한 번 세션스토리지에 저장해두면, 그 탭 안에서는 페이지를 이동해도 계속 그 날짜로 유지된다)
+function getTestDateOverride(){
+  try{
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get('testDate');
+    if(fromUrl === 'clear'){
+      sessionStorage.removeItem('__testDate');
+      return null;
+    }
+    if(fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl)){
+      sessionStorage.setItem('__testDate', fromUrl);
+      return fromUrl;
+    }
+    const fromSession = sessionStorage.getItem('__testDate');
+    if(fromSession && /^\d{4}-\d{2}-\d{2}$/.test(fromSession)) return fromSession;
+  }catch(e){ /* URL/sessionStorage 접근 실패 시 그냥 무시하고 실제 오늘 날짜를 쓴다 */ }
+  return null;
+}
+
 function getTodayStr(){
+  const override = getTestDateOverride();
+  if(override) return override;
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,'0');
