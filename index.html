@@ -160,8 +160,7 @@
     position:absolute;top:4px;left:7px;
   }
   .cell.start .cell-num{color:rgba(255,255,255,.85);}
-  .cell-emoji{font-size:20px; transition:opacity .25s ease;}
-  .cell-check{position:absolute;bottom:3px;right:5px;font-size:11px;}
+  .cell-emoji{font-size:28px; transition:opacity .25s ease;}
   .cell.current{border-color:var(--sunset-1); box-shadow:0 0 0 3px rgba(255,107,74,.18), 0 2px 8px -2px rgba(32,36,31,.08);}
   .cell.current .cell-emoji{opacity:.3;}
 
@@ -786,6 +785,7 @@ function normalizeState(parsed){
   try{
     if(typeof parsed.goal !== 'string') parsed.goal = '';
     if(typeof parsed.privacyConsentAt !== 'number') parsed.privacyConsentAt = null; // 동의 절차 도입 이전 기존 기록 대응
+    if(typeof parsed.adminMode !== 'boolean') parsed.adminMode = false; // 테스트 파일 전용 — 배포용에는 없음
     if(typeof parsed.rulesSeenVersion !== 'string') parsed.rulesSeenVersion = null; // 규칙 NEW 배지 도입 이전 기존 기록 대응
 
     // 예전 버전(세션 구분 없이 최상위에 바로 위치/레벨 등이 있던 구조) 데이터가 있으면
@@ -877,6 +877,7 @@ function freshState(nickname, goal){
     trainingFull: { session3: {}, session4: {} }, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
     trainingFullRecord: { session3: {}, session4: {} }, // 풀코스 기록반 훈련 프로그램 체크리스트
     rulesSeenVersion: null, // 러닝마블 규칙을 마지막으로 읽은 버전 — CURRENT_RULES_VERSION이랑 다르면 NEW 배지가 뜬다
+    adminMode: false, // 테스트 파일 전용 — 배포용에는 없음
     privacyConsentAt: Date.now(), // 개인정보 수집·이용 동의 시점 (닉네임 설정 화면에서 체크 후에만 이 함수가 호출됨)
     createdAt: Date.now(),
   };
@@ -1073,6 +1074,29 @@ function ensureDailyRollsFresh(){
 function getRollsLeft(){
   ensureDailyRollsFresh();
   return Math.max(0, MAX_ROLLS_PER_DAY - state.dailyRolls.count);
+}
+
+/* =========================================================
+   관리자 모드 (닉네임 타이틀을 짧은 시간 안에 5번 연속 탭) — 테스트 파일 전용, 배포용에는 없음
+   ========================================================= */
+let adminTapCount = 0;
+let adminTapTimer = null;
+const ADMIN_TAP_TARGET = 5;
+const ADMIN_TAP_WINDOW = 700; // ms
+
+function handleAdminTap(){
+  adminTapCount++;
+  if(adminTapTimer) clearTimeout(adminTapTimer);
+  adminTapTimer = setTimeout(()=>{ adminTapCount = 0; }, ADMIN_TAP_WINDOW);
+
+  if(adminTapCount >= ADMIN_TAP_TARGET){
+    adminTapCount = 0;
+    clearTimeout(adminTapTimer);
+    state.adminMode = !state.adminMode;
+    saveState(state);
+    showToast(state.adminMode ? '🔓 관리자 모드 ON — 주사위 무제한' : '🔒 관리자 모드 OFF', 1800);
+    renderGame();
+  }
 }
 
 let state = null; // 로그인 상태에 따라 boot 로직이 Firestore에서 직접 채워준다 (로컬 저장소는 쓰지 않음)
@@ -1939,7 +1963,7 @@ function renderGame(){
         ${miniLogoHtml()}
         <div class="w-11 h-11 flex-shrink-0"></div>
       </div>
-      <h1 class="font-display text-lg font-bold text-center mb-8" style="user-select:none;">
+      <h1 id="dashboard-title" class="font-display text-lg font-bold text-center mb-8" style="user-select:none;">
         <span class="sunset-text">${escapeHtml(state.nickname)}</span>의 러닝마블 <span style="color:${sessionColor}; font-size:0.7em; font-weight:800;">${sessionLabel}</span>
       </h1>
 
@@ -1978,7 +2002,13 @@ function renderGame(){
         </div>
 
         <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:3;">
-          ${notStartedYet ? `
+          ${state.adminMode ? `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="display:flex; gap:8px;"><div id="dice1" class="die"></div><div id="dice2" class="die"></div></div><div id="dice-sum" class="font-display font-bold" style="font-size:13px; color:var(--sunset-1); min-height:16px;"></div></div>
+            <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm">
+              주사위 던지기
+            </button>
+            <p class="text-xs" style="color:var(--text-dim)">🔓 관리자 모드 · 무제한</p>
+          ` : notStartedYet ? `
             <div class="text-3xl">🔒</div>
             <button id="roll-btn" class="track-btn px-6 py-2.5 rounded-full font-display font-bold text-white text-sm" disabled style="opacity:.4; cursor:not-allowed;">
               주사위 던지기
@@ -2010,7 +2040,7 @@ function renderGame(){
 
   renderCells();
   positionToken(state.position, false);
-  if(!notStartedYet && !allMastered){
+  if(state.adminMode || (!notStartedYet && !allMastered)){
     renderDicePips(1, 'dice1');
     renderDicePips(1, 'dice2');
   }
@@ -2019,6 +2049,7 @@ function renderGame(){
   if(rollBtn) rollBtn.addEventListener('click', handleRollClick);
   document.getElementById('marble-back-btn').addEventListener('click', goToHub);
   document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
+  document.getElementById('dashboard-title').addEventListener('click', handleAdminTap);
   const rulesLink = document.getElementById('rules-link');
   if(rulesLink){
     rulesLink.addEventListener('click', ()=>{
@@ -2051,15 +2082,12 @@ function renderCells(){
     div.style.left = xPct + '%';
     div.style.top = yPct + '%';
 
-    // 완료할 때마다(1회=1개 ~ 5회=5개) 이모티콘을 하나씩 더 보여준다. (START는 항상 1개)
-    const emojiCount = isStart ? 1 : Math.max(1, Math.min(level, MAX_LEVEL));
-    const emojiSize = emojiCount<=1 ? 20 : emojiCount===2 ? 16 : emojiCount===3 ? 13 : emojiCount===4 ? 11 : 9;
-    const emojiHtml = mission.emoji.repeat(emojiCount);
+    // 완료 여부는 칸 배경색(lvl1/2/3)으로만 표현하고, 이모지는 항상 하나만 칸에 꽉 차게 크게 보여준다.
+    const emojiHtml = mission.emoji;
     const numLabel = isStart ? '' : MISSION_NUMBER[i];
 
     div.innerHTML = `
-      <span class="cell-emoji" style="font-size:${emojiSize}px;">${emojiHtml}</span>
-      ${(!isStart && level >= 1) ? '<span class="cell-check">✅</span>' : ''}
+      <span class="cell-emoji">${emojiHtml}</span>
     `;
     div.addEventListener('click', ()=> openMission(i));
     layer.appendChild(div);
@@ -2288,9 +2316,9 @@ async function syncRollAvailabilityFromCloud(){
 
 async function onRoll(){
   if(isRolling) return;
-  // 세션별 주사위 활성 기간 — 버튼 자체는 renderGame()에서 이미 비활성화되지만,
+  // 세션별 주사위 활성 기간(관리자 모드는 예외) — 버튼 자체는 renderGame()에서 이미 비활성화되지만,
   // 혹시 모를 우회(개발자도구 등)를 막기 위해 실제로 굴리는 함수 안에서도 한 번 더 확인한다.
-  if(!isDiceActiveForCurrentSession()){
+  if(!state.adminMode && !isDiceActiveForCurrentSession()){
     const range = SESSION_DICE_DATES[currentSession];
     showToast(`🔒 러닝마블 기간이 아니에요 (${formatShortDate(range.start)}~${formatShortDate(range.end)})`);
     return;
@@ -2298,10 +2326,12 @@ async function onRoll(){
 
   isRolling = true; // 아래 클라우드 확인하는 동안에도 중복 클릭 막기
   setBackButtonLocked(true); // 주사위 굴리는 동안엔 뒤로가기로 못 나가게 막는다 (애니메이션 중간에 나가면 위치 저장이 안 될 수 있음)
-  await syncRollAvailabilityFromCloud();
+  if(!state.adminMode){
+    await syncRollAvailabilityFromCloud();
+  }
 
   const hasBonus = (state.bonusRolls || 0) > 0;
-  if(getRollsLeft() <= 0 && !hasBonus){
+  if(!state.adminMode && getRollsLeft() <= 0 && !hasBonus){
     markRollingDone();
     setBackButtonLocked(false);
     showToast('오늘 주사위를 모두 사용했어요! 내일 다시 도전해보세요');
@@ -2344,11 +2374,13 @@ async function onRoll(){
       cloudIncrement({ bonusRolls: 1 }); // 클라우드에도 '더하기'로 안전하게 반영
       showToast(`🎲 더블! (${d1}, ${d2}) 보너스 주사위 +1`, 2400);
     }
-    if(getRollsLeft() > 0){
-      state.dailyRolls.count += 1;
-    } else if(state.bonusRolls > 0){
-      state.bonusRolls -= 1;
-      cloudIncrement({ bonusRolls: -1 }); // 클라우드에도 '빼기'로 안전하게 반영
+    if(!state.adminMode){
+      if(getRollsLeft() > 0){
+        state.dailyRolls.count += 1;
+      } else if(state.bonusRolls > 0){
+        state.bonusRolls -= 1;
+        cloudIncrement({ bonusRolls: -1 }); // 클라우드에도 '빼기'로 안전하게 반영
+      }
     }
     saveState(state);
     moveToken(result, ()=>{
