@@ -786,6 +786,7 @@ function normalizeState(parsed){
   try{
     if(typeof parsed.goal !== 'string') parsed.goal = '';
     if(typeof parsed.privacyConsentAt !== 'number') parsed.privacyConsentAt = null; // 동의 절차 도입 이전 기존 기록 대응
+    if(typeof parsed.rulesSeenVersion !== 'string') parsed.rulesSeenVersion = null; // 규칙 NEW 배지 도입 이전 기존 기록 대응
 
     // 예전 버전(세션 구분 없이 최상위에 바로 위치/레벨 등이 있던 구조) 데이터가 있으면
     // 세션3 자리로 옮겨준다 (세션 나누기 이전 테스트 기록 대응 — 한 번만 필요한 마이그레이션).
@@ -875,6 +876,7 @@ function freshState(nickname, goal){
     trainingHalf: { session3: {}, session4: {} }, // 하프 마라톤 훈련 프로그램 체크리스트
     trainingFull: { session3: {}, session4: {} }, // 풀코스 마라톤(첫 완주) 훈련 프로그램 체크리스트
     trainingFullRecord: { session3: {}, session4: {} }, // 풀코스 기록반 훈련 프로그램 체크리스트
+    rulesSeenVersion: null, // 러닝마블 규칙을 마지막으로 읽은 버전 — CURRENT_RULES_VERSION이랑 다르면 NEW 배지가 뜬다
     privacyConsentAt: Date.now(), // 개인정보 수집·이용 동의 시점 (닉네임 설정 화면에서 체크 후에만 이 함수가 호출됨)
     createdAt: Date.now(),
   };
@@ -1148,6 +1150,10 @@ const SESSION_DICE_DATES = {
   session4: { start: '2026-09-13', end: '2026-09-30' }, // 10/1 00:00부터 비활성
 };
 const SESSION4_REVEAL_DATE = '2026-09-10'; // 세션4 탭 자체(러닝마블판·훈련 일정)가 열리는 날짜
+
+// 러닝마블 규칙 내용을 바꿀 때마다 이 문자열을 새로 바꿔주면, 아직 이 버전을 안 읽어본 참가자들
+// 화면에만 "러닝마블 규칙" 버튼에 NEW 배지가 다시 뜬다 (한 번 눌러서 읽으면 계정에 기록되어 사라짐).
+const CURRENT_RULES_VERSION = '2026-08-27';
 
 function isSession4Revealed(){
   return getTodayStr() >= SESSION4_REVEAL_DATE;
@@ -1938,9 +1944,12 @@ function renderGame(){
       </h1>
 
       <div class="flex gap-2 mb-4">
-        <a href="https://sd283610.github.io/testmf3/rule.html" target="_blank" rel="noopener noreferrer" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-center"
-          style="background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
+        <a id="rules-link" href="https://sd283610.github.io/testmf3/rule.html" target="_blank" rel="noopener noreferrer" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-center"
+          style="position:relative; background:var(--bg-elev-2); border:1px solid var(--sunset-1); color:var(--sunset-1);">
           📖 러닝마블 규칙
+          ${state.rulesSeenVersion !== CURRENT_RULES_VERSION ? `
+            <span id="rules-new-badge" style="position:absolute; top:-8px; right:-6px; background:var(--sunset-1); color:#fff; font-size:9px; font-weight:800; padding:2px 7px; border-radius:999px; letter-spacing:.02em; box-shadow:0 2px 6px -1px rgba(255,107,74,.5);">NEW</span>
+          ` : ''}
         </a>
         <button id="marble-history-btn" type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold"
           style="background:var(--bg-elev-2); border:1px solid var(--line); color:var(--text);">
@@ -2010,6 +2019,17 @@ function renderGame(){
   if(rollBtn) rollBtn.addEventListener('click', handleRollClick);
   document.getElementById('marble-back-btn').addEventListener('click', goToHub);
   document.getElementById('marble-history-btn').addEventListener('click', openMarbleHistoryModal);
+  const rulesLink = document.getElementById('rules-link');
+  if(rulesLink){
+    rulesLink.addEventListener('click', ()=>{
+      if(state.rulesSeenVersion !== CURRENT_RULES_VERSION){
+        state.rulesSeenVersion = CURRENT_RULES_VERSION;
+        saveState(state);
+        const badge = document.getElementById('rules-new-badge');
+        if(badge) badge.remove();
+      }
+    });
+  }
 }
 
 // "나의 러닝마블 내역 보기"와 같은 스타일의, 완료 대기 미션 확인 버튼 HTML을 만든다.
